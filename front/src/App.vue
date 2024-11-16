@@ -1,27 +1,16 @@
 <!-- App.vue -->
 <template>
   <div id="app">
-    <div id='map'></div> 
-      <FloatWindow title="3D城市广告牌曝光分析系统" class="analysis-window">
-      <div class="button-group">
-        <button class="primary-btn" @click="triggerFileInput">
-          <i class="fas fa-building"></i>
-          加载3D建筑
-        </button>
-        <button class="primary-btn" @click="addCustomThreeboxModel">
-          <i class="fas fa-cube"></i>
-          加载Threebox模型
-        </button>
-        <button class="primary-btn" @click="toggleFloatWindow">
-          <i class="fas fa-window-maximize"></i>
-          显示浮动窗口
-        </button>
-      </div>
-
-      <input ref="fileInput" type="file" style="display: none" @change="handleFileSelect" accept=".geojson"/>
-      
+    <div id='map'></div>
+    <FloatWindow title="3D城市广告牌曝光分析系统" class="analysis-window">
       <div class="control-panel">
         <div class="drawing-controls">
+          <button class="primary-btn" @click="fetchGeojsonFromBackend">
+            加载3D建筑
+          </button>
+          <button class="primary-btn" @click="handleExposureAnalysis">
+            曝光分析
+          </button>
           <button class="action-btn" :class="{ active: isDrawing }" @click="toggleDrawing">
             {{ isDrawing ? '停止绘制' : '开始绘制' }}
           </button>
@@ -34,190 +23,133 @@
           <div class="slider-container">
             <div class="slider-header">
               <label>广告牌高度</label>
-              <span class="value">{{billboardHeight}}m</span>
+              <span class="value">{{ billboardHeight }}m</span>
             </div>
-            <input 
-              type="range"
-              v-model.number="billboardHeight"
-              @input="updateBillboardDimensions"
-              min="0"
-              max="100"
-              step="1"
-              class="slider"
-            />
+            <input type="range" v-model.number="billboardHeight" @input="updateBillboardDimensions" min="0" max="100"
+              step="1" class="slider" />
           </div>
-          
+
           <div class="slider-container">
             <div class="slider-header">
               <label>距地面高度</label>
-              <span class="value">{{groundHeight}}m</span>
+              <span class="value">{{ groundHeight }}m</span>
             </div>
-            <input 
-              type="range"
-              v-model.number="groundHeight"
-              @input="updateBillboardDimensions"
-              min="0"
-              max="100"
-              step="1"
-              class="slider"
-            />
+            <input type="range" v-model.number="groundHeight" @input="updateBillboardDimensions" min="0" max="100"
+              step="1" class="slider" />
           </div>
         </div>
       </div>
-    </FloatWindow>
-    <FloatWindow v-if="showFloatWindow" title="3D模型展示">
-      <ThreeDModel></ThreeDModel>
     </FloatWindow>
   </div>
 </template>
 
 <script>
 import mapboxgl from "mapbox-gl";
-import ThreeDModel from "./components/ThreeDModel.vue";
 import FloatWindow from "./components/FloatWindow.vue";
 import DrawBoard from '@/utils/DrawBoard.js';
+import ExposureAnalysis from '@/utils/ExposureAnalysis.js';
 
 export default {
-name: "App",
-components: {
-  FloatWindow,
-  ThreeDModel,
-},
-data() {
-  return {
-    map: null,
-    tb: null,
-    showFloatWindow: false,
-    isDrawing:false,
-    billboardHeight:30,
-    groundHeight:50,
-    drawLine:null,
-  };
-},
+  name: "App",
+  components: {
+    FloatWindow,
+  },
+  data() {
+    return {
+      map: null,
+      isDrawing: false,
+      billboardHeight: 30,
+      groundHeight: 50,
+      drawLine: null,
+      exposureAnalysis: null,
+    };
+  },
 
-mounted() {
-  mapboxgl.accessToken = 'pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw';
-  this.map = new mapboxgl.Map({
+  mounted() {
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw';
+    this.map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/light-v11',       
-      center: { lng: 118.7497830, lat: 32.0527050 },  //南京鼓楼区
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: { lng: 116.4170, lat: 39.9288 },  //北京东城区
       zoom: 15.4,           //缩放级别
-      pitch: 64.9,          // 倾斜角度
-      bearing: 17.5,        // 旋转角度
-      antialias: true 
-  });
-
-  //初始化DrawLine实例
-  this.drawboard=new DrawBoard(this.map,this.billboardHeight,this.groundHeight);  //初始化绘制广告牌实例
-
-  // 初始化Threebox
-  this.tb = (window.tb = new window.Threebox(
-        this.map,
-        this.map.getCanvas().getContext('webgl'),
-        {
-            defaultLights: true
-        },
-        console.log("Threebox初始化完成")
-    ));
-  
-},
-
-methods:{
-  // 加载GeoJSON数据
-  loadGeojson(file){
-    const reader=new FileReader();  
-    reader.onload=(event)=>{
-      const data=JSON.parse(event.target.result);
-      console.log("GeoJSON数据加载完成", data);
-      this.map.addSource('buildings', {
-        'type': 'geojson',
-        'data': data
-      });
-
-      // 添加3D建筑层
-      this.map.addLayer({
-        'id': '3d-buildings',
-        'type': 'fill-extrusion',
-        'source': 'buildings',
-        'paint': {
-          'fill-extrusion-color': '#000',  //黑色填充
-          'fill-extrusion-height': ['to-number', ['get', 'height']],  // 确保转换为数值
-          'fill-extrusion-base': 0,  // 设置建筑物的基础高度，通常为0
-          'fill-extrusion-opacity': 0.9  // 设置建筑物的透明度
-        }
-      });
-    }
-    reader.readAsText(file);
-  },
-  // 打开文件窗口并加载geojson数据
-  triggerFileInput(){
-        this.$refs.fileInput.click();
-    },
-  handleFileSelect(event){
-      const file=event.target.files[0];
-      if(file && file.name.endsWith('.geojson')){
-          console.log('加载GeoJSON文件', file);
-          this.loadGeojson(file);
-      }else{
-          alert('请选择一个GeoJSON文件');
-      }
-  },
-
-  // 加载Threebox模型
-  addCustomThreeboxModel() {
-    const map = this.map;
-    const tb = this.tb;
-    map.addLayer({
-      id: 'custom-threebox-model',
-      type: 'custom',
-      renderingMode: '3d',
-      onAdd: function () {
-          console.log("开始加载Threebox模型....");
-          const scale = 3.2;
-          const options = {
-              obj: 'https://docs.mapbox.com/mapbox-gl-js/assets/metlife-building.gltf',
-              type: 'gltf',
-              scale: { x: scale, y: scale, z: 2.7 },
-              units: 'meters',
-              rotation: { x: 90, y: -90, z: 0 }
-          };
-          tb.loadObj(options, (model) => {
-              model.setCoords([118.7497830, 32.0527050 ]);
-              model.setRotation({ x: 0, y: 0, z: 241 });
-              tb.add(model);
-              console.log("Threebox模型加载完成....");
-          });
-      },
-      render: function () {
-          tb.update();
-      }
+      pitch: 69,          // 倾斜角度
+      bearing: 15,        // 旋转角度
+      antialias: true
     });
+
+    //初始化DrawLine实例
+    this.drawboard = new DrawBoard(this.map, this.billboardHeight, this.groundHeight);  //初始化绘制广告牌实例
+  
+    //初始化曝光分析实例
+    this.exposureAnalysis = new ExposureAnalysis(this.map);
   },
 
-  // 显示浮动窗口(3维模型)
-  toggleFloatWindow(){
-    this.showFloatWindow=!this.showFloatWindow;
-  },
+  methods: {
+    // 从后端获取GeoJSON数据
+    async fetchGeojsonFromBackend() {
+      try {
+        // 如果已经存在建筑物图层，先移除
+        if (this.map.getLayer('3d-buildings')) {
+          this.map.removeLayer('3d-buildings');
+        }
+        if (this.map.getSource('buildings')) {
+          this.map.removeSource('buildings');
+        }
+        const response = await fetch('http://localhost:3000/geojson');
+        const data = await response.json();
+        console.log("从后端获取的GeoJSON数据:", data);       
+        // 添加数据源
+        this.map.addSource('buildings', {
+          'type': 'geojson',
+          'data': data
+        });
+        // 添加3D建筑层
+        this.map.addLayer({
+          'id': '3d-buildings',
+          'type': 'fill-extrusion',
+          'source': 'buildings',
+          'paint': {
+            'fill-extrusion-color': '#000',  //黑色填充
+            'fill-extrusion-height': ['to-number', ['get', 'height']],  
+            'fill-extrusion-base': 0,  
+            'fill-extrusion-opacity': 0.9  
+          }
+        });
+      } catch (error) {
+        console.error("加载GeoJSON数据失败:", error);
+      }
+    },
 
-  // 开始/停止绘制
-  toggleDrawing(){
-    this.isDrawing=!this.isDrawing;
-    if(this.isDrawing){
-      this.drawboard.startDrawing();
-    }else{
-      this.drawboard.stopDrawing();
+    // 开始/停止绘制
+    toggleDrawing() {
+      this.isDrawing = !this.isDrawing;
+      if (this.isDrawing) {
+        this.drawboard.startDrawing();
+      } else {
+        this.drawboard.stopDrawing();
+      }
+    },
+    // 清除上一个广告牌
+    clearLastBillboard() {
+      this.drawboard.clearLastBillboard();
+    },
+    // 更新广告牌高度和距地面高度
+    updateBillboardDimensions() {
+      this.drawboard.updateBillboardHeight(this.billboardHeight, this.groundHeight);
+    },
+
+    // 曝光分析
+    async handleExposureAnalysis() {
+      try {
+        const result = await this.exposureAnalysis.sendBillboardsToBackend();
+        console.log('广告牌数据已发送到后端:', result);
+        // TODO: 处理后端返回的结果
+      } catch (error) {
+        console.error('曝光分析失败:', error);
+      }
     }
-  },
-  // 清除上一个广告牌
-  clearLastBillboard(){
-    this.drawboard.clearLastBillboard();
-  },
-  // 更新广告牌高度和距地面高度
-  updateBillboardDimensions(){
-    this.drawboard.updateBillboardHeight(this.billboardHeight,this.groundHeight);
-  }
 
-},
+  },
 };
 </script>
 
@@ -228,13 +160,15 @@ methods:{
   overflow: hidden;
   position: relative;
 }
+
 #map {
   width: 100%;
   height: 100%;
   position: absolute;
-  top: 0;    
-  left: 0; 
-  z-index: 0;  /*地图图层在最底层*/
+  top: 0;
+  left: 0;
+  z-index: 0;
+  /*地图图层在最底层*/
 }
 
 .analysis-window {
@@ -244,13 +178,6 @@ methods:{
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 
-}
-
-.button-group {
-  display: flex;
-  gap:10px;
-  margin-bottom: 5px;
-  padding: 10px;
 }
 
 .primary-btn {
@@ -277,7 +204,8 @@ methods:{
   background: #f5f5f5;
   padding: 15px;
   border-radius: 6px;
-  margin: 0px 10px 20px 10px;  /*上右下左*/
+  margin: 0px 10px 20px 10px;
+  /*上右下左*/
 }
 
 .drawing-controls {
@@ -354,7 +282,7 @@ methods:{
   background: #4CAF50;
   cursor: pointer;
   border: 2px solid white;
-  box-shadow: 0 0 2px rgba(0,0,0,0.2);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
 }
 
 .slider::-moz-range-thumb {
@@ -364,7 +292,6 @@ methods:{
   background: #4CAF50;
   cursor: pointer;
   border: 2px solid white;
-  box-shadow: 0 0 2px rgba(0,0,0,0.2);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
 }
-
 </style>

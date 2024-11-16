@@ -39,26 +39,30 @@ export default class DrawBoard {
         });
         console.log('临时线段图层已添加');
   
-        // Billboard layer
+        // 添加广告牌图层数据源
+        // 使用GeoJSON格式存储广告牌数据
+        // 'billboards'是数据源的唯一标识符
+        // data中定义了一个空的FeatureCollection,用于后续添加广告牌要素
         this.map.addSource('billboards', {
-          type: 'geojson',
+          type: 'geojson', // 数据类型为GeoJSON
           data: {
-            type: 'FeatureCollection',
-            features: []
+            type: 'FeatureCollection', // GeoJSON要素集合
+            features: [] // 初始化为空数组,稍后会添加广告牌要素
           }
         });
-        console.log('广告牌数据源已添加');
+        console.log('广告牌数据源已添加'); // 日志记录数据源添加成功
   
+        // 添加广告牌的3D图层
         this.map.addLayer({
-            id: 'billboards-3d',
-            type: 'fill-extrusion',
-            source: 'billboards',
+            id: 'billboards-3d', // 图层唯一标识符
+            type: 'fill-extrusion', // 3D填充挤出类型,用于创建3D效果
+            source: 'billboards', // 使用之前创建的billboards数据源
             paint: {
-              'fill-extrusion-color': ['get', 'color'],
-              'fill-extrusion-opacity': 0.8,
-              'fill-extrusion-height': ['get', 'height'],
-              'fill-extrusion-base': ['get', 'base'],
-              'fill-extrusion-vertical-gradient': true
+              'fill-extrusion-color': ['get', 'color'], // 从feature属性中获取color值作为颜色
+              'fill-extrusion-opacity': 0.8, // 设置透明度为0.8
+              'fill-extrusion-height': ['get', 'height'], // 从feature属性中获取height值作为高度
+              'fill-extrusion-base': ['get', 'base'], // 从feature属性中获取base值作为基准高度
+              'fill-extrusion-vertical-gradient': true // 启用垂直渐变效果
             }
           });
         console.log('广告牌3D图层已添加');

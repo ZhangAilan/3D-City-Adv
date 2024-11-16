@@ -3,6 +3,7 @@ front/node_modules
 /dist
 
 front/package-lock.json
+server/venv
 
 # local env files
 .env.local
