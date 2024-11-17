@@ -4,6 +4,7 @@ front/node_modules
 
 front/package-lock.json
 server/venv
+__pycache__
 
 # local env files
 .env.local

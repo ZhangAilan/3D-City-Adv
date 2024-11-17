@@ -46,6 +46,7 @@ export default class ExposureAnalysis {
         });
   
         const result = await response.json();
+        console.log('广告牌数据已发送到后端:', result);
         return result;
       } catch (error) {
         console.error('发送广告牌数据失败:', error);

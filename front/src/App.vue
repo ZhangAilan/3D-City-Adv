@@ -109,7 +109,7 @@ export default {
           'type': 'fill-extrusion',
           'source': 'buildings',
           'paint': {
-            'fill-extrusion-color': '#000',  //黑色填充
+            'fill-extrusion-color': '#000',  //色填充
             'fill-extrusion-height': ['to-number', ['get', 'height']],  
             'fill-extrusion-base': 0,  
             'fill-extrusion-opacity': 0.9  
@@ -141,11 +141,82 @@ export default {
     // 曝光分析
     async handleExposureAnalysis() {
       try {
+        console.log('开始曝光分析...');
+        
+        // 发送广告牌数据到后端
+        console.log('正在发送广告牌数据...');
         const result = await this.exposureAnalysis.sendBillboardsToBackend();
-        console.log('广告牌数据已发送到后端:', result);
-        // TODO: 处理后端返回的结果
+        console.log('发送广告牌数据结果:', result);
+        
+        if(!result || result.status !== 'success') {
+          throw new Error('发送广告牌数据失败');
+        }
+        
+        // 添加延迟，确保后端有足够时间处理数据
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 获取曝光区域数据
+        console.log('开始获取曝光区域数据...');
+        const response = await fetch('http://127.0.0.1:3000/calculate-exposure', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        }).catch(error => {
+          console.error('请求失败:', error);
+          throw new Error('网络请求失败');
+        });
+        
+        console.log('收到响应:', response);
+        
+        if(!response.ok) {
+          const errorText = await response.text();
+          console.error('响应错误:', errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const exposureData = await response.json().catch(error => {
+          console.error('JSON解析失败:', error);
+          throw new Error('数据格式错误');
+        });
+        
+        console.log('收到的曝光数据:', exposureData);
+        
+        if(!exposureData || exposureData.status === 'error') {
+          throw new Error(exposureData.message || '获取曝光数据失败');
+        }
+        
+        // 如果已存在曝光区域图层，先移除
+        if (this.map.getLayer('exposure-area')) {
+          this.map.removeLayer('exposure-area');
+        }
+        if (this.map.getSource('exposure')) {
+          this.map.removeSource('exposure');
+        }
+        
+        // 添加曝光区域数据源
+        this.map.addSource('exposure', {
+          type: 'geojson',
+          data: exposureData
+        });
+        
+        // 添加曝光区域图层为填充区域
+        this.map.addLayer({
+          id: 'exposure-area',
+          type: 'fill',
+          source: 'exposure',
+          paint: {
+            'fill-color': '#ffff00', // 纯黄色
+            'fill-opacity': 0.5
+          }
+        });
+
+        console.log('曝光区域图层添加成功');
+
       } catch (error) {
         console.error('曝光分析失败:', error);
+        alert('曝光分析失败: ' + error.message);
       }
     }
 

@@ -1,10 +1,14 @@
 from flask import Flask,jsonify,request
 from flask_cors import CORS  #跨域
 from config.database import Database
+from analysis.exposure import ExposureAnalyzer
 import json
 
 app = Flask(__name__)
 CORS(app)
+
+# 全局变量存储当前的广告牌数据
+current_billboards = []
 
 @app.route('/')
 def hello_world():
@@ -52,8 +56,34 @@ def save_billboards():
             "message": str(e)
         }), 500
 
-# 全局变量存储当前的广告牌数据
-current_billboards = []
+@app.route('/calculate-exposure', methods=['GET'])
+def calculate_exposure():
+    """计算所有广告牌的曝光区域"""
+    try:
+        # 初始化分析器并加载数据
+        analyzer = ExposureAnalyzer()
+        if not analyzer.load_data(current_billboards):
+            return jsonify({
+                "status": "error",
+                "message": "加载数据失败"
+            }), 500
+            
+        # 计算曝光区域
+        exposure_geojson = analyzer.calculate_exposure_areas()
+        if exposure_geojson is None:
+            return jsonify({
+                "status": "error",
+                "message": "计算曝光区域失败"
+            }), 500
+            
+        # 直接返回GeoJSON，不需要额外的data包装
+        return jsonify(exposure_geojson)
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=3000)
