@@ -9,6 +9,8 @@ CORS(app)
 
 # 全局变量存储当前的广告牌数据
 current_billboards = []
+current_GEA = []
+current_IA = []
 
 @app.route('/')
 def hello_world():
@@ -56,29 +58,74 @@ def save_billboards():
             "message": str(e)
         }), 500
 
-@app.route('/calculate-exposure', methods=['GET'])
-def calculate_exposure():
+@app.route('/GEA', methods=['GET'])
+def calculate_GEA():
     """计算所有广告牌的曝光区域"""
     try:
-        # 初始化分析器并加载数据
+        # 初始化分析器并加载建筑物数据
         analyzer = ExposureAnalyzer()
-        if not analyzer.load_data(current_billboards):
+        if not analyzer.load_buildings():
             return jsonify({
                 "status": "error",
                 "message": "加载数据失败"
             }), 500
             
         # 计算曝光区域
-        exposure_geojson = analyzer.calculate_exposure_areas()
+        exposure_geojson = analyzer.calculate_GEA(current_billboards)
         if exposure_geojson is None:
             return jsonify({
                 "status": "error",
                 "message": "计算曝光区域失败"
             }), 500
-            
+        global current_GEA
+        current_GEA = exposure_geojson  # 保存计算结果
         # 直接返回GeoJSON，不需要额外的data包装
         return jsonify(exposure_geojson)
         
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/IA', methods=['GET'])
+def calculate_IA():
+    """计算所有广告牌的遮挡区域"""
+    try:
+        analyzer = ExposureAnalyzer()
+        if not analyzer.load_buildings():
+            return jsonify({
+                "status": "error",
+                "message": "加载数据失败"
+            }), 500
+        #计算遮挡区域
+        occlusion_geojson = analyzer.calculate_IA(current_billboards,current_GEA)
+        global current_IA
+        current_IA = occlusion_geojson  # 保存计算结果
+        if occlusion_geojson is None:
+            return jsonify({
+                "status": "error",
+                "message": "计算遮挡区域失败"
+            }), 500
+        return jsonify(occlusion_geojson)
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/VA', methods=['GET'])
+def calculate_VA():
+    """计算所有广告牌的显示区域"""
+    try:    
+        analyzer = ExposureAnalyzer()
+        visible_area_geojson = analyzer.calculate_visible_area(current_GEA, current_IA)
+        if visible_area_geojson is None:
+            return jsonify({
+                "status": "error",
+                "message": "计算显示区域失败"
+            }), 500
+        return jsonify(visible_area_geojson)
     except Exception as e:
         return jsonify({
             "status": "error",

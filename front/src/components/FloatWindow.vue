@@ -38,7 +38,7 @@ export default {
       windowTop: 50,
       windowLeft: 50,
       windowWidth: 500,
-      windowHeight: 500,
+      windowHeight: 560,
       dragStartX: 0,
       dragStartY: 0,
       resizeStartWidth: 0,
