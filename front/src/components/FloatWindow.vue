@@ -4,17 +4,16 @@
     class="floating-window"
     :style="{ width: windowWidth + 'px', height: windowHeight + 'px', top: windowTop + 'px', left: windowLeft + 'px' }"
     ref="window"
-    @mousedown="startDrag"
-    @mouseup="stopDrag"
-    @mousemove="dragWindow"
   >
-    <div class="header">
-      <img src="@/assets/logo.png" alt="Logo" class="window-logo me-2" />
-      <span class="title h4 mb-0">{{ title }}</span>  
-      <button @click="closeWindow" class="close-btn">×</button>
+    <div class="header" 
+      @mousedown="startDrag"
+      @mousemove="dragWindow"
+      @mouseup="stopDrag"
+    >
+      <span class="window-title h4 mb-0">{{ title }}</span>  
     </div>
     <div class="content">
-      <slot></slot> <!-- 插入其他组件的地方 -->
+      <slot></slot>
     </div>
     <div class="resize-handle" @mousedown="startResize"></div>
   </div>
@@ -36,7 +35,7 @@ export default {
       isDragging: false,
       isResizing: false,
       windowTop: 50,
-      windowLeft: 50,
+      windowLeft: 150,
       windowWidth: 500,
       windowHeight: 560,
       dragStartX: 0,
@@ -49,27 +48,18 @@ export default {
   },
   methods: {
     startDrag(event) {
-      if (event.target === this.$refs.window || event.target === this.$refs.window.querySelector('.header')) {
-        this.isDragging = true;
-        this.dragStartX = event.clientX;
-        this.dragStartY = event.clientY;
-      }
+      this.isDragging = true;
+      this.dragStartX = event.clientX - this.windowLeft;
+      this.dragStartY = event.clientY - this.windowTop;
     },
     stopDrag() {
       this.isDragging = false;
     },
     dragWindow(event) {
       if (this.isDragging) {
-        const deltaX = event.clientX - this.dragStartX;
-        const deltaY = event.clientY - this.dragStartY;
-        this.windowLeft += deltaX;
-        this.windowTop += deltaY;
-        this.dragStartX = event.clientX;
-        this.dragStartY = event.clientY;
+        this.windowLeft = event.clientX - this.dragStartX;
+        this.windowTop = event.clientY - this.dragStartY;
       }
-    },
-    closeWindow() {
-      this.isVisible = false;
     },
     startResize(event) {
       this.isResizing = true;
@@ -92,10 +82,14 @@ export default {
     }
   },
   mounted() {
+    window.addEventListener('mousemove', this.dragWindow);
+    window.addEventListener('mouseup', this.stopDrag);
     window.addEventListener('mousemove', this.resizeWindow);
     window.addEventListener('mouseup', this.stopResize);
   },
   beforeUnmount() {
+    window.removeEventListener('mousemove', this.dragWindow);
+    window.removeEventListener('mouseup', this.stopDrag);
     window.removeEventListener('mousemove', this.resizeWindow);
     window.removeEventListener('mouseup', this.stopResize);
   }
@@ -135,14 +129,6 @@ export default {
   margin: 0;
 }
 
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: white;
-  cursor: pointer;
-}
-
 .content {
   padding: 0px;
   height: calc(100% - 40px); /* 留出空间给header */
@@ -175,11 +161,11 @@ height: 16px;
 }
 }
 
-.title {
-font-size: 1.25rem;  /* 20px */
-font-weight: 500;
-margin: 0 10px;
-color: white;
+.window-title {
+  text-align: center;
+  width: 100%;
+  color: #ffffff;
+  font-size: 20px; /* 增大字体大小 */
 }
 </style>
   

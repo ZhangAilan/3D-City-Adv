@@ -2,7 +2,35 @@
 <template>
   <div id="app">
     <div id='map'></div>
-    <FloatWindow title="3D城市广告牌曝光分析系统" class="analysis-window">
+    
+    <!-- 添加侧边栏 -->
+    <div class="sidebar">
+      <button class="sidebar-btn" @click="toggleWindow('billboard-analysis')">
+        曝光分析
+      </button>
+      <button class="sidebar-btn" @click="toggleWindow('audience-preference')">
+        观众偏好
+      </button>
+      <button class="sidebar-btn" @click="toggleWindow('billboard-optimization')">
+        区位优化
+      </button>
+      <button class="sidebar-btn" @click="toggleWindow('location-optimization')">
+        布局优化
+      </button>
+      <button class="sidebar-btn">
+        第一人称
+      </button>
+      <button class="sidebar-btn" @click="toggleWindow('settings')">
+        系统设置
+      </button>
+    </div>
+
+    <!-- 原有的分析窗口 -->
+    <FloatWindow 
+      title="3D城市广告牌曝光分析系统" 
+      class="analysis-window"
+      v-show="activeWindow === 'billboard-analysis'"
+    >
       <div class="control-panel">
         <div class="drawing-controls">
           <button class="primary-btn" @click="fetchGeojsonFromBackend">
@@ -55,6 +83,55 @@
         </div>
       </div>
     </FloatWindow>
+
+    <FloatWindow 
+      title="观众偏好" 
+      class="analysis-window"
+      v-show="activeWindow === 'audience-preference'"
+    >
+    </FloatWindow>
+
+    <FloatWindow 
+      title="区位优化" 
+      class="analysis-window"
+      v-show="activeWindow === 'billboard-optimization'"
+    >
+    </FloatWindow>
+
+    <FloatWindow 
+      title="布局优化" 
+      class="analysis-window"
+      v-show="activeWindow === 'location-optimization'"
+    >
+    </FloatWindow>
+
+    <!-- 新增系统设置窗口 -->
+    <FloatWindow 
+      title="系统设置" 
+      class="analysis-window"
+      v-show="activeWindow === 'settings'"
+    >
+      <div class="settings-panel">
+        <h3>系统设置</h3>
+        <div class="settings-controls">
+          <div class="setting-item">
+            <label>地图样式</label>
+            <select v-model="mapStyle">
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+              <option value="satellite">卫星</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label>语言</label>
+            <select v-model="language">
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </FloatWindow>
   </div>
 </template>
 
@@ -78,6 +155,7 @@ export default {
       drawLine: null,
       exposureAnalysis: null,
       mapLayerManager: null,
+      activeWindow: 'billboard-analysis', // 当前激活的窗口
     };
   },
 
@@ -231,7 +309,11 @@ export default {
         console.error('清除分析图层失败:', error);
         alert('清除分析图层失败: ' + error.message);
       }
-    }
+    },
+
+    toggleWindow(windowName) {
+      this.activeWindow = this.activeWindow === windowName ? null : windowName;
+    },
   },
 };
 </script>
@@ -431,4 +513,33 @@ export default {
 .analysis-btn.clear:hover {
   background: #c0392b;
 }
+
+.sidebar {
+  position: fixed;
+  left: 20px;
+  top: 50%;  
+  transform: translateY(-50%);  
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.sidebar-btn {
+  padding: 12px 20px;
+  background: #40668b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.sidebar-btn:hover {
+  background: #487bad;
+  transform: translateX(5px);
+}
+
 </style>
