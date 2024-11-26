@@ -2,14 +2,14 @@
 <template>
   <div id="app">
     <div id='map'></div>
-    
+
     <!-- 添加侧边栏 -->
     <div class="sidebar">
       <button class="sidebar-btn" @click="toggleWindow('billboard-analysis')">
         曝光分析
       </button>
       <button class="sidebar-btn" @click="toggleWindow('audience-preference')">
-        观众偏好
+        流量分析
       </button>
       <button class="sidebar-btn" @click="toggleWindow('billboard-optimization')">
         区位优化
@@ -25,12 +25,7 @@
       </button>
     </div>
 
-    <!-- 原有的分析窗口 -->
-    <FloatWindow 
-      title="3D城市广告牌曝光分析系统" 
-      class="analysis-window"
-      v-show="activeWindow === 'billboard-analysis'"
-    >
+    <FloatWindow title="3D城市广告牌曝光分析系统" class="analysis-window" v-show="activeWindow === 'billboard-analysis'">
       <div class="control-panel">
         <div class="drawing-controls">
           <button class="primary-btn" @click="fetchGeojsonFromBackend">
@@ -43,7 +38,6 @@
             清除上一个广告牌
           </button>
         </div>
-
         <div class="slider-group">
           <div class="slider-container">
             <div class="slider-header">
@@ -53,7 +47,6 @@
             <input type="range" v-model.number="billboardHeight" @input="updateBillboardDimensions" min="0" max="100"
               step="1" class="slider" />
           </div>
-
           <div class="slider-container">
             <div class="slider-header">
               <label>距地面高度</label>
@@ -64,7 +57,6 @@
           </div>
         </div>
       </div>
-
       <div class="analysis-buttons">
         <h3>分析功能</h3>
         <div class="button-group">
@@ -84,33 +76,34 @@
       </div>
     </FloatWindow>
 
-    <FloatWindow 
-      title="观众偏好" 
-      class="analysis-window"
-      v-show="activeWindow === 'audience-preference'"
-    >
+    <FloatWindow title="流量分析" class="analysis-window" v-show="activeWindow === 'audience-preference'">
+      <div class="analysis-buttons">
+        <div class="drawing-controls">
+          <button class="primary-btn" @click="handleChartDisplay('time')" :class="{ active: activeChart === 'time' }">
+            GPS流量统计
+          </button>
+          <button class="primary-btn" @click="addHeatmapLayer">
+            人流密度热力图
+          </button>
+          <button class="action-btn delete" @click="clearHeatmap">
+            清除热力图
+          </button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <!--时间图表-->
+        <div id="time-chart" class="chart-area" v-show="activeChart === 'time'"></div>
+      </div>
     </FloatWindow>
 
-    <FloatWindow 
-      title="区位优化" 
-      class="analysis-window"
-      v-show="activeWindow === 'billboard-optimization'"
-    >
+    <FloatWindow title="区位优化" class="analysis-window" v-show="activeWindow === 'billboard-optimization'">
     </FloatWindow>
 
-    <FloatWindow 
-      title="布局优化" 
-      class="analysis-window"
-      v-show="activeWindow === 'location-optimization'"
-    >
+    <FloatWindow title="布局优化" class="analysis-window" v-show="activeWindow === 'location-optimization'">
     </FloatWindow>
 
     <!-- 新增系统设置窗口 -->
-    <FloatWindow 
-      title="系统设置" 
-      class="analysis-window"
-      v-show="activeWindow === 'settings'"
-    >
+    <FloatWindow title="系统设置" class="analysis-window" v-show="activeWindow === 'settings'">
       <div class="settings-panel">
         <h3>系统设置</h3>
         <div class="settings-controls">
@@ -137,10 +130,12 @@
 
 <script>
 import mapboxgl from "mapbox-gl";
+import * as echarts from 'echarts';
 import FloatWindow from "./components/FloatWindow.vue";
 import DrawBoard from '@/utils/DrawBoard.js';
 import ExposureAnalysis from '@/utils/ExposureAnalysis.js';
 import MapLayerManager from '@/utils/MapLayer.js';
+import TimeAnalysis from '@/utils/TimeAnalysis.js';
 export default {
   name: "App",
   components: {
@@ -156,6 +151,10 @@ export default {
       exposureAnalysis: null,
       mapLayerManager: null,
       activeWindow: 'billboard-analysis', // 当前激活的窗口
+      activeChart: 'time',  //当前图表
+      charts: {
+        time: null,
+      }
     };
   },
 
@@ -179,6 +178,7 @@ export default {
 
     //初始化地图图层管理实例
     this.mapLayerManager = new MapLayerManager(this.map);
+
   },
 
   methods: {
@@ -253,7 +253,7 @@ export default {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         await this.mapLayerManager.fetchAndDisplayLayer(
-          'http://127.0.0.1:3000/GEA', 
+          'http://127.0.0.1:3000/GEA',
           'exposure-area',
           '#ffff00',
           0.5
@@ -272,7 +272,7 @@ export default {
 
         await this.mapLayerManager.fetchAndDisplayLayer(
           'http://127.0.0.1:3000/IA',
-          'occlusion-area', 
+          'occlusion-area',
           '#0000ff',
           0.5
         );
@@ -289,11 +289,11 @@ export default {
         console.log('开始可见区域分析...');
         // 先清除其他分析图层
         this.mapLayerManager.clearOtherLayers('visible-area');
-        
+
         await this.mapLayerManager.fetchAndDisplayLayer(
-          'http://127.0.0.1:3000/VA', 
-          'visible-area', 
-          '#00ff00', 
+          'http://127.0.0.1:3000/VA',
+          'visible-area',
+          '#00ff00',
           0.5
         );
       } catch (error) {
@@ -302,6 +302,7 @@ export default {
       }
     },
 
+    // 清除分析图层
     clearAnalysisLayers() {
       try {
         this.mapLayerManager.clearAnalysisLayers();
@@ -311,9 +312,174 @@ export default {
       }
     },
 
+    // 切换窗口
     toggleWindow(windowName) {
       this.activeWindow = this.activeWindow === windowName ? null : windowName;
     },
+
+    // 处理图表显示
+    async handleChartDisplay(chartType) {
+      this.activeChart = chartType;
+      //确保DOM更新
+      await this.$nextTick();
+      switch (chartType) {
+        case 'time':
+          await this.initTimeChart();
+          break;
+        case 'density':
+          await this.initDensityChart();
+          break;
+      }
+    },
+
+    // 初始化时间图表
+    async initTimeChart() {
+      if (!this.charts.time) {
+        const chartDom = document.getElementById('time-chart');
+        this.charts.time = echarts.init(chartDom);
+      }
+      try {
+        const response = await fetch('http://127.0.0.1:3000/gps-info');
+        const data = await response.json();
+        const hourCounts = TimeAnalysis.processTimeData(data);
+        // 定义ECharts图表配置选项
+        const option = {
+          // 图表标题配置
+          title: {
+            text: '24小时GPS轨迹点统计', // 图表主标题文本
+            left: 'center'  // 标题水平居中对齐
+          },
+          // 提示框配置
+          tooltip: {
+            trigger: 'axis', // 触发类型:坐标轴触发
+            axisPointer: {
+              type: 'shadow' // 指示器类型:阴影指示器
+            }
+          },
+          // 直角坐标系内绘图网格设置
+          grid: {
+            left: '3%',  // 距离容器左侧的距离
+            right: '4%', // 距离容器右侧的距离  
+            bottom: '3%', // 距离容器底部的距离
+            containLabel: true // 包含坐标轴标签
+          },
+          // X轴配置
+          xAxis: {
+            type: 'category', // 类目轴,适用于离散数据
+            // 生成0-23的小时数据,补零对齐
+            data: Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')),
+            axisTick: {
+              show: false // 不显示坐标轴刻度
+            }
+          },
+          // Y轴配置
+          yAxis: {
+            type: 'value' // 数值轴,适用于连续数据
+          },
+          // 系列列表配置
+          series: [{
+            data: hourCounts, // 显示每小时的统计数据
+            type: 'bar' // 柱状图类型
+          }]
+        }
+        // 使用配置项设置图表
+        this.charts.time.setOption(option);
+      } catch (error) {
+        console.error('时间图表初始化失败:', error);
+      }
+    },
+
+    // 添加热力图图层
+    async addHeatmapLayer() {
+      try {
+        // 获取热力图数据
+        const response = await fetch('http://127.0.0.1:3000/heatmap');
+        const heatmapData = await response.json();
+        
+        // 如果已存在热力图图层，先移除
+        if (this.map.getLayer('heatmap-layer')) {
+          this.map.removeLayer('heatmap-layer');
+        }
+        if (this.map.getSource('heatmap-source')) {
+          this.map.removeSource('heatmap-source');
+        }
+
+        // 添加热力图数据源
+        this.map.addSource('heatmap-source', {
+          type: 'geojson',
+          data: heatmapData
+        });
+
+        // 添加热力图图层
+        this.map.addLayer({
+          id: 'heatmap-layer',
+          type: 'heatmap',
+          source: 'heatmap-source',
+          paint: {
+            // 权重表达式
+            'heatmap-weight': [
+              'interpolate',
+              ['linear'],
+              ['get', 'weight'],
+              0, 0,
+              10000, 1
+            ],
+            // 热力图强度
+            'heatmap-intensity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              0, 1,
+              15, 3
+            ],
+            // 热力图颜色渐变 - 使用更深的颜色
+            'heatmap-color': [
+              'interpolate',
+              ['linear'],
+              ['heatmap-density'],
+              0, 'rgba(0,51,102,0)',
+              0.2, 'rgb(0,102,204)',
+              0.4, 'rgb(0,153,255)',
+              0.6, 'rgb(255,153,51)',
+              0.8, 'rgb(255,51,0)',
+              1, 'rgb(153,0,0)'
+            ],
+            // 热力图半径
+            'heatmap-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              0, 2,
+              15, 20
+            ],
+            // 热力图透明度 - 降低透明度使颜色更明显
+            'heatmap-opacity': 0.9
+          }
+        });
+
+        // 热力图加载完成后,调整地图视角
+        this.map.easeTo({
+          zoom: 13,
+          pitch: 45, // 设置倾斜角度为69,俯视视角
+          bearing: 135, // 设置旋转角度为15
+          duration: 1000 // 动画持续1秒
+        });
+
+        console.log('热力图加载成功');
+      } catch (error) {
+        console.error('加载热力图失败:', error);
+      }
+    },
+
+    // 清除热力图
+    clearHeatmap() {
+      if (this.map.getLayer('heatmap-layer')) {
+        this.map.removeLayer('heatmap-layer');
+      }
+      if (this.map.getSource('heatmap-source')) {
+        this.map.removeSource('heatmap-source');
+      }
+    }
   },
 };
 </script>
@@ -365,6 +531,7 @@ export default {
   transform: translateY(-5px);
 }
 
+/*控制面板*/
 .control-panel {
   background: #f5f5f5;
   padding: 15px;
@@ -465,7 +632,7 @@ export default {
   padding: 15px;
   border-radius: 8px;
   margin: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .analysis-buttons h3 {
@@ -498,12 +665,12 @@ export default {
 .analysis-btn:hover {
   background: #34495e;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .analysis-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .analysis-btn.clear {
@@ -517,8 +684,8 @@ export default {
 .sidebar {
   position: fixed;
   left: 20px;
-  top: 50%;  
-  transform: translateY(-50%);  
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -542,4 +709,19 @@ export default {
   transform: translateX(5px);
 }
 
+/*图表样式*/
+.chart-container {
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 10px;
+}
+
+.chart-area {
+  width: 100%;
+  height: 350px;
+  background: #fff;
+  border-radius: 8px;
+  margin-top: 10px;
+}
 </style>

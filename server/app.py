@@ -2,6 +2,7 @@ from flask import Flask,jsonify,request
 from flask_cors import CORS  #跨域
 from config.database import Database
 from analysis.exposure import ExposureAnalyzer
+from analysis.gps_info import GPSAnalyzer
 import json
 
 app = Flask(__name__)
@@ -11,6 +12,7 @@ CORS(app)
 current_billboards = []
 current_GEA = []
 current_IA = []
+current_VA = []
 
 @app.route('/')
 def hello_world():
@@ -120,6 +122,8 @@ def calculate_VA():
     try:    
         analyzer = ExposureAnalyzer()
         visible_area_geojson = analyzer.calculate_visible_area(current_GEA, current_IA)
+        global current_VA
+        current_VA = visible_area_geojson  # 保存计算结果
         if visible_area_geojson is None:
             return jsonify({
                 "status": "error",
@@ -127,6 +131,60 @@ def calculate_VA():
             }), 500
         return jsonify(visible_area_geojson)
     except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/gps-info', methods=['GET'])
+def get_gps_info():
+    """获取曝光区域内的出租车GPS信息"""
+    try:
+        print("开始获取GPS信息...")
+        analyzer = GPSAnalyzer()
+        #加载GPS数据
+        if not analyzer.load_gps_data():
+            return jsonify({
+                "status": "error",
+                "message": "加载GPS数据失败"
+            }), 500
+        #曝光区域
+        gps_data = analyzer.filter_gps_in_exposure(current_VA)
+        
+        if gps_data is None:
+            print("GPS数据为空")
+            return jsonify({
+                "status": "error",
+                "message": "获取GPS信息失败"
+            }), 500
+        return jsonify(gps_data)
+    except Exception as e:
+        print(f"获取GPS信息时发生错误: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/heatmap', methods=['GET'])
+def get_heatmap():
+    """获取热力图"""
+    try:    
+        print("开始获取热力图...")
+        analyzer = GPSAnalyzer()
+        if not analyzer.load_gps_data():
+            return jsonify({
+                "status": "error",
+                "message": "加载GPS数据失败"
+            }), 500
+        heatmap_data = analyzer.generate_heatmap()
+        if heatmap_data is None:
+            return jsonify({
+                "status": "error",
+                "message": "获取热力图失败"
+            }), 500
+        return jsonify(heatmap_data)
+    except Exception as e:
+        print(f"获取热力图时发生错误: {str(e)}")
         return jsonify({
             "status": "error",
             "message": str(e)

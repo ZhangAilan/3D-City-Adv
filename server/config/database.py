@@ -32,3 +32,17 @@ class Database:
         finally:
             cur.close()
             conn.close()
+
+    def fetch_gps(self):
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT * FROM gps")
+            results = cur.fetchall()
+            return results
+        except Exception as e:
+            print(f"查询错误: {str(e)}")
+            raise e
+        finally:
+            cur.close()
+            conn.close()
