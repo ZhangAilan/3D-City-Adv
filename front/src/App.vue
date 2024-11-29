@@ -12,18 +12,20 @@
         流量分析
       </button>
       <button class="sidebar-btn" @click="toggleWindow('billboard-optimization')">
-        区位优化
-      </button>
-      <button class="sidebar-btn" @click="toggleWindow('location-optimization')">
         布局优化
       </button>
-      <button class="sidebar-btn">
+      <button class="sidebar-btn" @click="toggleWindow('location-optimization')">
+        区位优化
+      </button>
+      <button class="sidebar-btn" @click="toggleFirstPerson">
         第一人称
       </button>
       <button class="sidebar-btn" @click="toggleWindow('settings')">
         系统设置
       </button>
     </div>
+
+    <FirstPersonView v-show="showFirstPerson" :mainMap="map" />
 
     <FloatWindow title="3D城市广告牌曝光分析系统" class="analysis-window" v-show="activeWindow === 'billboard-analysis'">
       <div class="control-panel">
@@ -96,31 +98,82 @@
       </div>
     </FloatWindow>
 
-    <FloatWindow title="区位优化" class="analysis-window" v-show="activeWindow === 'billboard-optimization'">
+    <FloatWindow title="布局优化" class="analysis-window" v-show="activeWindow === 'billboard-optimization'">
     </FloatWindow>
 
-    <FloatWindow title="布局优化" class="analysis-window" v-show="activeWindow === 'location-optimization'">
+    <FloatWindow title="区位优化" class="analysis-window" v-show="activeWindow === 'location-optimization'">
     </FloatWindow>
 
     <!-- 新增系统设置窗口 -->
-    <FloatWindow title="系统设置" class="analysis-window" v-show="activeWindow === 'settings'">
+    <FloatWindow title="系统设置" class="analysis-window settings-window" v-show="activeWindow === 'settings'">
       <div class="settings-panel">
-        <h3>系统设置</h3>
-        <div class="settings-controls">
-          <div class="setting-item">
-            <label>地图样式</label>
-            <select v-model="mapStyle">
-              <option value="light">浅色</option>
-              <option value="dark">深色</option>
-              <option value="satellite">卫星</option>
-            </select>
+        <div class="setting-section">
+          <h3>地图样式</h3>
+          <div class="map-styles">
+            <div 
+              v-for="style in mapStyles" 
+              :key="style.id"
+              class="style-item"
+              :class="{ active: currentMapStyle === style.url }"
+              @click="changeMapStyle(style.url)"
+            >
+              <img :src="style.preview" :alt="style.name">
+              <span>{{ style.name }}</span>
+            </div>
           </div>
-          <div class="setting-item">
-            <label>语言</label>
-            <select v-model="language">
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
+        </div>
+
+        <!-- 新增颜色设置部分 -->
+        <div class="setting-section">
+          <h3>颜色设置</h3>
+          <div class="color-settings">
+            <div class="color-item">
+              <label>建筑物颜色</label>
+              <div class="color-picker">
+                <input 
+                  type="color" 
+                  v-model="colors.building" 
+                  @change="updateBuildingColor"
+                >
+                <span>{{ colors.building }}</span>
+              </div>
+            </div>
+
+            <div class="color-item">
+              <label>曝光区域颜色</label>
+              <div class="color-picker">
+                <input 
+                  type="color" 
+                  v-model="colors.exposure" 
+                  @change="updateExposureColor"
+                >
+                <span>{{ colors.exposure }}</span>
+              </div>
+            </div>
+
+            <div class="color-item">
+              <label>遮挡区域颜色</label>
+              <div class="color-picker">
+                <input 
+                  type="color" 
+                  v-model="colors.occlusion" 
+                  @change="updateOcclusionColor"
+                >
+                <span>{{ colors.occlusion }}</span>
+              </div>
+            </div>
+
+            <div class="color-item">
+              <label>可见区域颜色</label>
+              <div class="color-picker">
+                <input 
+                  type="color" 
+                  v-model="colors.visible" 
+                  @change="updateVisibleColor"
+                >
+                <span>{{ colors.visible }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -132,14 +185,20 @@
 import mapboxgl from "mapbox-gl";
 import * as echarts from 'echarts';
 import FloatWindow from "./components/FloatWindow.vue";
+import FirstPersonView from "./components/FirstPersonView.vue";
 import DrawBoard from '@/utils/DrawBoard.js';
 import ExposureAnalysis from '@/utils/ExposureAnalysis.js';
 import MapLayerManager from '@/utils/MapLayer.js';
 import TimeAnalysis from '@/utils/TimeAnalysis.js';
+import '@/styles/settings.css'  // 引入settings.css
+import '@/styles/analysis.css'  // 引入analysis.css
+import '@/styles/sidebar.css'   // 引入sidebar.css
+
 export default {
   name: "App",
   components: {
     FloatWindow,
+    FirstPersonView,
   },
   data() {
     return {
@@ -150,10 +209,44 @@ export default {
       drawLine: null,
       exposureAnalysis: null,
       mapLayerManager: null,
-      activeWindow: 'billboard-analysis', // 当前激活的窗口
+      activeWindow: null, // 当前激活的窗口
       activeChart: 'time',  //当前图表
       charts: {
         time: null,
+      },
+      showFirstPerson: false,
+      currentMapStyle: 'mapbox://styles/mapbox/light-v11',
+      mapStyles: [
+        {
+          id: 'light',
+          name: '浅色',
+          url: 'mapbox://styles/mapbox/light-v11',
+          preview: 'https://api.mapbox.com/styles/v1/mapbox/light-v11/static/0,0,1/300x200?access_token=pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw'
+        },
+        {
+          id: 'dark',
+          name: '深色',
+          url: 'mapbox://styles/mapbox/dark-v11',
+          preview: 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/0,0,1/300x200?access_token=pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw'
+        },
+        {
+          id: 'satellite',
+          name: '卫星',
+          url: 'mapbox://styles/mapbox/satellite-v9',
+          preview: 'https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/0,0,1/300x200?access_token=pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw'
+        },
+        {
+          id: 'streets',
+          name: '街道',
+          url: 'mapbox://styles/mapbox/streets-v12',
+          preview: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/0,0,1/300x200?access_token=pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw'
+        }
+      ],
+      colors: {
+        building: '#000000',    // 建筑物默认颜色
+        exposure: '#ffff00',    // 曝光区域默认颜色
+        occlusion: '#0000ff',   // 遮挡区域默认颜色
+        visible: '#00ff00'      // 可见区域默认颜色
       }
     };
   },
@@ -206,7 +299,7 @@ export default {
           'type': 'fill-extrusion',
           'source': 'buildings',
           'paint': {
-            'fill-extrusion-color': '#000',  //色填充
+            'fill-extrusion-color': this.colors.building,  // 使用颜色变量
             'fill-extrusion-height': ['to-number', ['get', 'height']],
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.9
@@ -255,7 +348,7 @@ export default {
         await this.mapLayerManager.fetchAndDisplayLayer(
           'http://127.0.0.1:3000/GEA',
           'exposure-area',
-          '#ffff00',
+          this.colors.exposure,  // 使用颜色变量
           0.5
         );
 
@@ -273,7 +366,7 @@ export default {
         await this.mapLayerManager.fetchAndDisplayLayer(
           'http://127.0.0.1:3000/IA',
           'occlusion-area',
-          '#0000ff',
+          this.colors.occlusion,  // 使用颜色变量
           0.5
         );
 
@@ -293,7 +386,7 @@ export default {
         await this.mapLayerManager.fetchAndDisplayLayer(
           'http://127.0.0.1:3000/VA',
           'visible-area',
-          '#00ff00',
+          this.colors.visible,  // 使用颜色变量
           0.5
         );
       } catch (error) {
@@ -356,7 +449,7 @@ export default {
               type: 'shadow' // 指示器类型:阴影指示器
             }
           },
-          // 直角坐标系内绘图网格设置
+          // 直角坐标系内绘图��格设置
           grid: {
             left: '3%',  // 距离容器左侧的距离
             right: '4%', // 距离容器右侧的距离  
@@ -479,6 +572,92 @@ export default {
       if (this.map.getSource('heatmap-source')) {
         this.map.removeSource('heatmap-source');
       }
+    },
+
+    // 切换第一人称视角
+    toggleFirstPerson() {
+      this.showFirstPerson = !this.showFirstPerson;
+    },
+
+    // 修改 changeMapStyle 方法
+    async changeMapStyle(styleUrl) {
+      this.currentMapStyle = styleUrl;
+      if (this.map) {
+        try {
+          // 保存当前的重要图层信息
+          const preserveLayers = [];
+          const layersToPreserve = ['3d-buildings', 'exposure-area', 'occlusion-area', 'visible-area', 'heatmap-layer'];
+          
+          // 保存需要保留的图层信息
+          for (const layerId of layersToPreserve) {
+            if (this.map.getLayer(layerId)) {
+              const sourceId = this.map.getLayer(layerId).source;
+              const sourceData = this.map.getSource(sourceId)._data;
+              
+              preserveLayers.push({
+                layerId,
+                sourceId,
+                sourceData,
+                // 保存图层的完整配置
+                layerConfig: this.map.getLayer(layerId)
+              });
+            }
+          }
+
+          // 设置新样式
+          this.map.setStyle(styleUrl);
+
+          // 等待新样式加载完成
+          this.map.once('style.load', () => {
+            // 恢复之前保存的图层
+            preserveLayers.forEach(({ layerId, sourceId, sourceData, layerConfig }) => {
+              // 添加数据源
+              if (!this.map.getSource(sourceId)) {
+                this.map.addSource(sourceId, {
+                  type: 'geojson',
+                  data: sourceData
+                });
+              }
+              
+              // 添加图层，使用完整的图层配置
+              if (!this.map.getLayer(layerId)) {
+                this.map.addLayer(layerConfig);
+              }
+            });
+          });
+
+        } catch (error) {
+          console.error('切换地图样式失败:', error);
+        }
+      }
+    },
+
+    // 更新建筑物颜色
+    updateBuildingColor() {
+      if (this.map.getLayer('3d-buildings')) {
+        this.map.setPaintProperty('3d-buildings', 'fill-extrusion-color', this.colors.building);
+      }
+    },
+
+    // 更新曝光区域颜色
+    updateExposureColor() {
+      if (this.map.getLayer('exposure-area')) {
+        this.map.setPaintProperty('exposure-area', 'fill-color', this.colors.exposure);
+      }
+    },
+
+    // 更新遮挡区域颜色
+    updateOcclusionColor() {
+      if (this.map.getLayer('occlusion-area')) {
+        this.map.setPaintProperty('occlusion-area', 'fill-color', this.colors.occlusion);
+      }
+    },
+
+    // 更新可见区域颜色
+    updateVisibleColor() {
+      if (this.map.getLayer('visible-area')) {
+        this.map.setPaintProperty('visible-area', 'fill-color', this.colors.visible);
+      }
     }
   },
 };
@@ -499,229 +678,5 @@ export default {
   top: 0;
   left: 0;
   z-index: 0;
-  /*地图图层在最底层*/
-}
-
-.analysis-window {
-  min-width: 320px;
-  padding: 0px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-
-}
-
-.primary-btn {
-  flex: 1;
-  padding: 10px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.primary-btn:hover {
-  background: #45a049;
-  transform: translateY(-5px);
-}
-
-/*控制面板*/
-.control-panel {
-  background: #f5f5f5;
-  padding: 15px;
-  border-radius: 6px;
-  margin: 0px 10px 20px 10px;
-  /*上右下左*/
-}
-
-.drawing-controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.action-btn {
-  padding: 8px 16px;
-  border: 2px solid #4CAF50;
-  background: white;
-  color: #4CAF50;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.action-btn.active {
-  background: #4CAF50;
-  color: white;
-}
-
-.action-btn.delete {
-  border-color: #ff4444;
-  color: #ff4444;
-}
-
-.action-btn.delete:hover {
-  background: #ff4444;
-  color: white;
-}
-
-.slider-group {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.slider-container {
-  width: 100%;
-}
-
-.slider-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.slider-header label {
-  color: #666;
-  font-weight: 500;
-}
-
-.value {
-  color: #4CAF50;
-  font-weight: 600;
-}
-
-.slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #ddd;
-  outline: none;
-  -webkit-appearance: none;
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #4CAF50;
-  cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
-}
-
-.slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #4CAF50;
-  cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
-}
-
-.analysis-buttons {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 8px;
-  margin: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.analysis-buttons h3 {
-  margin: 0 0 15px 0;
-  color: #2c3e50;
-  font-size: 16px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.button-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.analysis-btn {
-  padding: 12px 20px;
-  background: #2c3e50;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  text-align: center;
-  width: 100%;
-}
-
-.analysis-btn:hover {
-  background: #34495e;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.analysis-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.analysis-btn.clear {
-  background: #e74c3c;
-}
-
-.analysis-btn.clear:hover {
-  background: #c0392b;
-}
-
-.sidebar {
-  position: fixed;
-  left: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 1000;
-}
-
-.sidebar-btn {
-  padding: 12px 20px;
-  background: #40668b;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.sidebar-btn:hover {
-  background: #487bad;
-  transform: translateX(5px);
-}
-
-/*图表样式*/
-.chart-container {
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  margin: 10px;
-}
-
-.chart-area {
-  width: 100%;
-  height: 350px;
-  background: #fff;
-  border-radius: 8px;
-  margin-top: 10px;
 }
 </style>

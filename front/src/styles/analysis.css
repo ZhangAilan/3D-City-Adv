@@ -1,0 +1,199 @@
+/* 分析窗口基础样式 */
+.analysis-window {
+    min-width: 320px;
+    padding: 0px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* 主要按钮样式 */
+.primary-btn {
+    flex: 1;
+    padding: 10px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.primary-btn:hover {
+    background: #45a049;
+    transform: translateY(-5px);
+}
+
+/* 控制面板样式 */
+.control-panel {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 6px;
+    margin: 0px 10px 20px 10px;
+}
+
+.drawing-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* 操作按钮样式 */
+.action-btn {
+    padding: 8px 16px;
+    border: 2px solid #4CAF50;
+    background: white;
+    color: #4CAF50;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.action-btn.active {
+    background: #4CAF50;
+    color: white;
+}
+
+.action-btn.delete {
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+.action-btn.delete:hover {
+    background: #ff4444;
+    color: white;
+}
+
+/* 滑块组样式 */
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.slider-container {
+    width: 100%;
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.slider-header label {
+    color: #666;
+    font-weight: 500;
+}
+
+.value {
+    color: #4CAF50;
+    font-weight: 600;
+}
+
+/* 滑块样式 */
+.slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+.slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 分析按钮区域样式 */
+.analysis-buttons {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.analysis-buttons h3 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 分析按钮样式 */
+.analysis-btn {
+    padding: 12px 20px;
+    background: #2c3e50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-align: center;
+    width: 100%;
+}
+
+.analysis-btn:hover {
+    background: #34495e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.analysis-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.analysis-btn.clear {
+    background: #e74c3c;
+}
+
+.analysis-btn.clear:hover {
+    background: #c0392b;
+}
+
+/* 图表容器样式 */
+.chart-container {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 10px;
+}
+
+.chart-area {
+    width: 100%;
+    height: 350px;
+    background: #fff;
+    border-radius: 8px;
+    margin-top: 10px;
+} 
