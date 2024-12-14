@@ -11,8 +11,8 @@
       <button class="sidebar-btn" @click="toggleWindow('audience-preference')">
         流量分析
       </button>
-      <button class="sidebar-btn" @click="toggleWindow('billboard-optimization')">
-        布局优化
+      <button class="sidebar-btn" @click="toggleWindow('poi-analysis')">
+        POI分析
       </button>
       <button class="sidebar-btn" @click="toggleWindow('location-optimization')">
         区位优化
@@ -98,8 +98,7 @@
       </div>
     </FloatWindow>
 
-    <FloatWindow title="布局优化" class="analysis-window" v-show="activeWindow === 'billboard-optimization'">
-    </FloatWindow>
+    <FloatWindow title="POI分析" class="analysis-window" v-show="activeWindow === 'poi-analysis'"></FloatWindow>
 
     <FloatWindow title="区位优化" class="analysis-window" v-show="activeWindow === 'location-optimization'">
     </FloatWindow>
@@ -202,15 +201,11 @@ export default {
   },
   data() {
     return {
-      map: null,
       isDrawing: false,
       billboardHeight: 30,
       groundHeight: 50,
-      drawLine: null,
-      exposureAnalysis: null,
-      mapLayerManager: null,
-      activeWindow: null, // 当前激活的窗口
-      activeChart: 'time',  //当前图表
+      activeWindow: null,
+      activeChart: 'time',
       charts: {
         time: null,
       },
@@ -243,35 +238,43 @@ export default {
         }
       ],
       colors: {
-        building: '#000000',    // 建筑物默认颜色
-        exposure: '#ffff00',    // 曝光区域默认颜色
-        occlusion: '#0000ff',   // 遮挡区域默认颜色
-        visible: '#00ff00'      // 可见区域默认颜色
+        building: '#000000',
+        exposure: '#ffff00',
+        occlusion: '#0000ff',
+        visible: '#00ff00'
       }
     };
   },
 
+  // 使用类成员变量存储地图相关实例和数据
+  map: null,
+  drawboard: null,
+  exposureAnalysis: null,
+  mapLayerManager: null,
+  geojsonData: null, // 存储GeoJSON数据
+  heatmapData: null, // 存储热力图数据
+
   mounted() {
     mapboxgl.accessToken = 'pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw';
+    
+    // 初始化地图
     this.map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/light-v11',
-      center: { lng: 116.4170, lat: 39.9288 },  //北京东城区
-      zoom: 15.4,           //缩放级别
-      pitch: 69,          // 倾斜角度
-      bearing: 15,        // 旋转角度
-      antialias: true
+      center: { lng: 116.4170, lat: 39.9288 },
+      zoom: 15.4,
+      pitch: 0,
+      bearing: 0,
+      maxPitch: 69,
+      antialias: true,
+      attributionControl: false,
+      preserveDrawingBuffer: false
     });
 
-    //初始化DrawLine实例
-    this.drawboard = new DrawBoard(this.map, this.billboardHeight, this.groundHeight);  //初始化绘制广告牌实例
-
-    //初始化曝光分析实例
+    // 初始化其他实例
+    this.drawboard = new DrawBoard(this.map, this.billboardHeight, this.groundHeight);
     this.exposureAnalysis = new ExposureAnalysis(this.map);
-
-    //初始化地图图层管理实例
     this.mapLayerManager = new MapLayerManager(this.map);
-
   },
 
   methods: {
@@ -285,24 +288,29 @@ export default {
         if (this.map.getSource('buildings')) {
           this.map.removeSource('buildings');
         }
+
         const response = await fetch('http://localhost:3000/geojson');
-        const data = await response.json();
-        console.log("从后端获取的GeoJSON数据:", data);
+        this.geojsonData = await response.json(); // 存储到类成员变量
+        
         // 添加数据源
         this.map.addSource('buildings', {
           'type': 'geojson',
-          'data': data
+          'data': this.geojsonData,
+          'worker': true,
+          'cluster': false
         });
-        // 添加3D建筑层
+
+        // 添加3D建筑层 - 移除 minzoom 限制
         this.map.addLayer({
           'id': '3d-buildings',
           'type': 'fill-extrusion',
           'source': 'buildings',
           'paint': {
-            'fill-extrusion-color': this.colors.building,  // 使用颜色变量
+            'fill-extrusion-color': this.colors.building,
             'fill-extrusion-height': ['to-number', ['get', 'height']],
             'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.9
+            'fill-extrusion-opacity': 0.9,
+            'fill-extrusion-vertical-gradient': true
           }
         });
       } catch (error) {
@@ -485,9 +493,11 @@ export default {
     // 添加热力图图层
     async addHeatmapLayer() {
       try {
-        // 获取热力图数据
         const response = await fetch('http://127.0.0.1:3000/heatmap');
-        const heatmapData = await response.json();
+        this.heatmapData = await response.json();
+        
+        // 数据预处理 - 降低过滤阈值使更多点显示
+        this.heatmapData.features = this.heatmapData.features.filter(f => f.properties.weight > 50);
         
         // 如果已存在热力图图层，先移除
         if (this.map.getLayer('heatmap-layer')) {
@@ -497,68 +507,68 @@ export default {
           this.map.removeSource('heatmap-source');
         }
 
-        // 添加热力图数据源
+        // 添加热力图数据源 - 减小聚类半径
         this.map.addSource('heatmap-source', {
           type: 'geojson',
-          data: heatmapData
+          data: this.heatmapData,
+          cluster: true,
+          clusterRadius: 30  // 减小聚类半径
         });
 
-        // 添加热力图图层
+        // 添加热力图图层 - 优化热力图参数
         this.map.addLayer({
           id: 'heatmap-layer',
           type: 'heatmap',
           source: 'heatmap-source',
           paint: {
-            // 权重表达式
+            // 权重插值
             'heatmap-weight': [
               'interpolate',
               ['linear'],
               ['get', 'weight'],
               0, 0,
+              100, 0.2,   // 增加中间值
+              1000, 0.5,  // 增加中间值
               10000, 1
             ],
+            
             // 热力图强度
             'heatmap-intensity': [
               'interpolate',
               ['linear'],
               ['zoom'],
-              0, 1,
-              15, 3
+              0, 0.5,
+              20, 2
             ],
-            // 热力图颜色渐变 - 使用更深的颜色
-            'heatmap-color': [
-              'interpolate',
-              ['linear'],
-              ['heatmap-density'],
-              0, 'rgba(0,51,102,0)',
-              0.2, 'rgb(0,102,204)',
-              0.4, 'rgb(0,153,255)',
-              0.6, 'rgb(255,153,51)',
-              0.8, 'rgb(255,51,0)',
-              1, 'rgb(153,0,0)'
-            ],
+            
             // 热力图半径
             'heatmap-radius': [
               'interpolate',
               ['linear'],
               ['zoom'],
-              0, 2,
-              15, 20
+              0, 10,
+              10, 15,
+              15, 30
             ],
-            // 热力图透明度 - 降低透明度使颜色更明显
+            
+            // 热力图颜色
+            'heatmap-color': [
+              'interpolate',
+              ['linear'],
+              ['heatmap-density'],
+              0, 'rgba(0, 0, 255, 0)',
+              0.2, 'rgba(0, 0, 255, 0.5)',
+              0.4, 'rgba(0, 255, 255, 0.7)',
+              0.6, 'rgba(0, 255, 0, 0.7)',
+              0.8, 'rgba(255, 255, 0, 0.8)',
+              1, 'rgba(255, 0, 0, 0.9)'
+            ],
+            
+            // 热力图不透明度
             'heatmap-opacity': 0.9
           }
         });
 
-        // 热力图加载完成后,调整地图视角
-        this.map.easeTo({
-          zoom: 13,
-          pitch: 45, // 设置倾斜角度为69,俯视视角
-          bearing: 135, // 设置旋转角度为15
-          duration: 1000 // 动画持续1秒
-        });
-
-        console.log('热力图加载成功');
       } catch (error) {
         console.error('加载热力图失败:', error);
       }

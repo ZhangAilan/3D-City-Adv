@@ -64,7 +64,8 @@ def calculate_billboard_direction(billboard_coords):
     '''
     计算广告牌方向，顺时针90度
     INPUT:
-        billboard_coords: 广告牌坐标，格式为 [[x1, y1], [x2, y2]]
+        billboard_coords: 广告牌坐标，格式为 [[lon1, lat1], [lon2, lat2]]
+        注意：第一个值是经度，第二个值是纬度
     OUTPUT:
         direction_vector: 方向向量，格式为 [x, y]
     '''
@@ -74,14 +75,30 @@ def calculate_billboard_direction(billboard_coords):
         
         import numpy as np
         
-        p1 = np.array(billboard_coords[0])
-        p2 = np.array(billboard_coords[1])
-        main_vector = p2 - p1
+        # 提取坐标点
+        lon1, lat1 = billboard_coords[0]
+        lon2, lat2 = billboard_coords[1]
         
-        # 计算顺时针90度的法向量
-        direction_vector = np.array([main_vector[1], -main_vector[0]])
-        # 单位化并缩小比例（避免坐标值过大）
-        direction_vector = direction_vector / (np.linalg.norm(direction_vector) * 1000)
+        # 转换为弧度
+        lat1 = np.radians(lat1)
+        lon1 = np.radians(lon1)
+        lat2 = np.radians(lat2)
+        lon2 = np.radians(lon2)
+        
+        # 计算广告牌的方向角（方位角）
+        dlon = lon2 - lon1
+        y = np.sin(dlon) * np.cos(lat2)
+        x = np.cos(lat1) * np.sin(lat2) - np.sin(lat1) * np.cos(lat2) * np.cos(dlon)
+        bearing = np.arctan2(y, x)
+        
+        # 将方向角转换为顺时针90度的方向
+        bearing = bearing + np.pi/2
+        
+        # 计算方向向量
+        direction_vector = np.array([np.sin(bearing), np.cos(bearing)])
+        
+        # 缩小比例（可选）
+        direction_vector = direction_vector / 1000
         
         print(f"[SUCCESS] 方向向量: {direction_vector}")
         
