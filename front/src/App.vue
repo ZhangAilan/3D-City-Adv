@@ -5,22 +5,37 @@
 
     <!-- 添加侧边栏 -->
     <div class="sidebar">
-      <button class="sidebar-btn" @click="toggleWindow('billboard-analysis')">
+      <button class="sidebar-btn analysis" @click="toggleWindow('billboard-analysis')">
         曝光分析
       </button>
-      <button class="sidebar-btn" @click="toggleWindow('audience-preference')">
+      <button class="sidebar-btn analysis" @click="toggleWindow('audience-preference')">
         流量分析
       </button>
-      <button class="sidebar-btn" @click="toggleWindow('poi-analysis')">
+      <button class="sidebar-btn analysis" @click="toggleWindow('accessibility-analysis')">
+        可达性分析
+      </button>
+      <button class="sidebar-btn analysis" @click="toggleWindow('poi-analysis')">
         POI分析
       </button>
-      <button class="sidebar-btn" @click="toggleWindow('location-optimization')">
+      <button class="sidebar-btn analysis" @click="toggleWindow('audience-analysis')">
+        受众分析
+      </button>
+      <button class="sidebar-btn analysis">
+        邻避分析
+      </button>
+      <button class="sidebar-btn optimization" @click="toggleWindow('location-optimization')">
         区位优化
       </button>
-      <button class="sidebar-btn" @click="toggleFirstPerson">
+      <button class="sidebar-btn optimization" @click="toggleWindow('layout-optimization')">
+        布局优化
+      </button>
+      <button class="sidebar-btn utility" @click="toggleFirstPerson">
         第一人称
       </button>
-      <button class="sidebar-btn" @click="toggleWindow('settings')">
+      <button class="sidebar-btn utility">
+        实景地图
+      </button>
+      <button class="sidebar-btn utility" @click="toggleWindow('settings')">
         系统设置
       </button>
     </div>
@@ -98,10 +113,119 @@
       </div>
     </FloatWindow>
 
+    <FloatWindow title="可达性分析" class="accessibility-window" v-show="activeWindow === 'accessibility-analysis'">
+      <div class="accessibility-panel">
+        <div class="parameter-section">
+          <h3>分析参数</h3>
+          <div class="parameter-controls">
+            <div class="parameter-item">
+              <label>步行速度 (km/h)</label>
+              <div class="slider-input">
+                <input type="range" v-model.number="walkingSpeed" min="1" max="10" step="0.1" class="slider">
+                <span class="value">{{ walkingSpeed }}</span>
+              </div>
+            </div>
+            <div class="parameter-item">
+              <label>时间阈值 (分钟)</label>
+              <div class="slider-input">
+                <input type="range" v-model.number="timeThreshold" min="5" max="30" step="1" class="slider">
+                <span class="value">{{ timeThreshold }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="accessibility-actions">
+            <button class="accessibility-btn" @click="handleAccessibilityAnalysis">
+              开始分析
+            </button>
+            <button class="accessibility-btn clear" @click="clearAccessibilityResults">
+              清除结果
+            </button>
+          </div>
+        </div>
+
+        <div class="legend-section">
+          <h3>图例说明</h3>
+          <div class="legend-content">
+            <div class="legend-item">
+              <div class="legend-color" style="background: linear-gradient(to right, rgba(255,0,0,0.8), rgba(255,255,0,0.8), rgba(255,255,255,0))"></div>
+              <div class="legend-labels">
+                <span>高可达性</span>
+                <span>中等</span>
+                <span>低可达性</span>
+              </div>
+            </div>
+            <div class="legend-info">
+              <p>颜色越深表示可达性越强，计算基于：</p>
+              <ul>
+                <li>步行速度：{{ walkingSpeed }} km/h</li>
+                <li>时间阈值：{{ timeThreshold }} 分钟</li>
+                <li>最大可达距离：{{ (walkingSpeed * timeThreshold / 60 * 1000).toFixed(0) }} 米</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="shortest-path-section">
+          <h3>最短路径分析</h3>
+          <div class="path-controls">
+            <button 
+              class="path-btn" 
+              :class="{ active: isMarkingPoints }"
+              @click="toggleMarkPoints"
+            >
+              {{ isMarkingPoints ? '停止标注' : '开始标注' }}
+            </button>
+            <button 
+              class="path-btn" 
+              @click="generateShortestPath"
+              :disabled="markedPoints.length < 2"
+            >
+              生成路径
+            </button>
+            <button 
+              class="path-btn clear" 
+              @click="clearPathLayer"
+            >
+              清除路径
+            </button>
+            <button 
+              class="path-btn clear" 
+              @click="clearMarkedPoints"
+            >
+              清除标注点
+            </button>
+          </div>
+          
+          <div class="path-info" v-if="pathDistance">
+            <div class="info-item">
+              <span class="label">路径距离：</span>
+              <span class="value">{{ pathDistance.toFixed(0) }} 米</span>
+            </div>
+          </div>
+
+          <div class="marked-points-list" v-if="markedPoints.length > 0">
+            <h4>已标注点位</h4>
+            <div class="points-container">
+              <div v-for="(point, index) in markedPoints" :key="index" class="point-item">
+                <span class="point-index">{{ index + 1 }}</span>
+                <span class="point-coords">
+                  [{{ point[0].toFixed(4) }}, {{ point[1].toFixed(4) }}]
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </FloatWindow>
+
     <FloatWindow title="POI分析" class="analysis-window" v-show="activeWindow === 'poi-analysis'"></FloatWindow>
 
+    <FloatWindow title="受众分析" class="analysis-window" v-show="activeWindow === 'audience-analysis'"></FloatWindow>
+    
     <FloatWindow title="区位优化" class="analysis-window" v-show="activeWindow === 'location-optimization'">
     </FloatWindow>
+
+    <FloatWindow title="布局优化" class="analysis-window" v-show="activeWindow === 'layout-optimization'"></FloatWindow>
 
     <!-- 新增系统设置窗口 -->
     <FloatWindow title="系统设置" class="analysis-window settings-window" v-show="activeWindow === 'settings'">
@@ -189,9 +313,11 @@ import DrawBoard from '@/utils/DrawBoard.js';
 import ExposureAnalysis from '@/utils/ExposureAnalysis.js';
 import MapLayerManager from '@/utils/MapLayer.js';
 import TimeAnalysis from '@/utils/TimeAnalysis.js';
+import AccessibilityAnalysis from '@/utils/Accessibility.js';
 import '@/styles/settings.css'  // 引入settings.css
 import '@/styles/analysis.css'  // 引入analysis.css
 import '@/styles/sidebar.css'   // 引入sidebar.css
+import '@/styles/accessibility.css';
 
 export default {
   name: "App",
@@ -242,7 +368,12 @@ export default {
         exposure: '#ffff00',
         occlusion: '#0000ff',
         visible: '#00ff00'
-      }
+      },
+      walkingSpeed: 5.0,    // 默认步行速度 5 km/h
+      timeThreshold: 15,    // 默认时间阈值 15 分钟
+      isMarkingPoints: false,
+      markedPoints: [],
+      pathDistance: null,
     };
   },
 
@@ -253,6 +384,7 @@ export default {
   mapLayerManager: null,
   geojsonData: null, // 存储GeoJSON数据
   heatmapData: null, // 存储热力图数据
+  accessibilityAnalysis: null,
 
   mounted() {
     mapboxgl.accessToken = 'pk.eyJ1IjoiYWlsYW56aGFuZyIsImEiOiJjbTMycjh3b28xMXg0MmlwcHd2ZmttZWYyIn0.T42ZxSkFvc05u3vfMT6Paw';
@@ -275,6 +407,7 @@ export default {
     this.drawboard = new DrawBoard(this.map, this.billboardHeight, this.groundHeight);
     this.exposureAnalysis = new ExposureAnalysis(this.map);
     this.mapLayerManager = new MapLayerManager(this.map);
+    this.accessibilityAnalysis = new AccessibilityAnalysis(this.map);
   },
 
   methods: {
@@ -457,7 +590,7 @@ export default {
               type: 'shadow' // 指示器类型:阴影指示器
             }
           },
-          // 直角坐标系内绘图��格设置
+          // 直角坐标系内绘图设置
           grid: {
             left: '3%',  // 距离容器左侧的距离
             right: '4%', // 距离容器右侧的距离  
@@ -497,7 +630,7 @@ export default {
         this.heatmapData = await response.json();
         
         // 数据预处理 - 降低过滤阈值使更多点显示
-        this.heatmapData.features = this.heatmapData.features.filter(f => f.properties.weight > 50);
+        this.heatmapData.features = this.heatmapData.features.filter(f => f.properties.weight > 30);
         
         // 如果已存在热力图图层，先移除
         if (this.map.getLayer('heatmap-layer')) {
@@ -507,65 +640,68 @@ export default {
           this.map.removeSource('heatmap-source');
         }
 
-        // 添加热力图数据源 - 减小聚类半径
+        // 添加热力图数据源 - 移除聚类功能
         this.map.addSource('heatmap-source', {
           type: 'geojson',
-          data: this.heatmapData,
-          cluster: true,
-          clusterRadius: 30  // 减小聚类半径
+          data: this.heatmapData
         });
 
-        // 添加热力图图层 - 优化热力图参数
+        // 添加热力图图层 - 优化参数以适应非聚类数据
         this.map.addLayer({
           id: 'heatmap-layer',
           type: 'heatmap',
           source: 'heatmap-source',
           paint: {
-            // 权重插值
+            // 权重插值 - 调整权重范围
             'heatmap-weight': [
               'interpolate',
               ['linear'],
               ['get', 'weight'],
-              0, 0,
-              100, 0.2,   // 增加中间值
-              1000, 0.5,  // 增加中间值
-              10000, 1
+              30, 0,      // 最小权重
+              100, 0.3,   // 低权重
+              500, 0.6,   // 中等权重
+              1000, 0.8,  // 高权重
+              5000, 1     // 最大权重
             ],
             
-            // 热力图强度
+            // 热力图强度 - 降低整体强度
             'heatmap-intensity': [
               'interpolate',
               ['linear'],
               ['zoom'],
-              0, 0.5,
-              20, 2
+              0, 0.5,    // 降低基础强度
+              10, 0.8,   // 中等缩放级别
+              15, 1.2,   // 较高缩放级别
+              20, 1.5    // 最大缩放级别
             ],
             
-            // 热力图半径
+            // 热力图半径 - 增大半径使热力图更平滑
             'heatmap-radius': [
               'interpolate',
               ['linear'],
               ['zoom'],
-              0, 10,
-              10, 15,
-              15, 30
+              0, 20,     // 基础半径
+              10, 25,    // 中等缩放级别
+              15, 30,    // 较高缩放级别
+              20, 40     // 最大缩放级别
             ],
             
-            // 热力图颜色
+            // 热力图颜色 - 使用更渐进的颜色过渡
             'heatmap-color': [
               'interpolate',
               ['linear'],
               ['heatmap-density'],
-              0, 'rgba(0, 0, 255, 0)',
-              0.2, 'rgba(0, 0, 255, 0.5)',
-              0.4, 'rgba(0, 255, 255, 0.7)',
-              0.6, 'rgba(0, 255, 0, 0.7)',
-              0.8, 'rgba(255, 255, 0, 0.8)',
-              1, 'rgba(255, 0, 0, 0.9)'
+              0, 'rgba(0, 0, 0, 0)',
+              0.2, 'rgba(0, 0, 255, 0.4)',   // 深蓝色
+              0.4, 'rgba(0, 255, 255, 0.6)', // 青色
+              0.6, 'rgba(0, 255, 0, 0.7)',   // 绿色
+              0.8, 'rgba(255, 255, 0, 0.8)', // 黄色
+              0.9, 'rgba(255, 128, 0, 0.9)', // 橙色
+              1, 'rgba(255, 0, 0, 1)'        // 红色
             ],
             
-            // 热力图不透明度
-            'heatmap-opacity': 0.9
+            // 热力图不透明度 - 保持适中的透明度
+            'heatmap-opacity': 0.7
           }
         });
 
@@ -668,6 +804,40 @@ export default {
       if (this.map.getLayer('visible-area')) {
         this.map.setPaintProperty('visible-area', 'fill-color', this.colors.visible);
       }
+    },
+
+    // 处理可达性分析
+    handleAccessibilityAnalysis() {
+      try {
+        this.accessibilityAnalysis.displayAccessibility(
+          this.walkingSpeed,
+          this.timeThreshold
+        );
+      } catch (error) {
+        console.error('可达性分析失败:', error);
+        alert('可达性分析失败: ' + error.message);
+      }
+    },
+
+    // 清除可达性分析结果
+    clearAccessibilityResults() {
+      try {
+        this.accessibilityAnalysis.clearAccessibility();
+      } catch (error) {
+        console.error('清除可达性分析结果失败:', error);
+        alert('清除可达性分析结果失败: ' + error.message);
+      }
+    },
+
+    toggleMarkPoints() {
+      this.isMarkingPoints = !this.isMarkingPoints;
+      this.accessibilityAnalysis.toggleMarkPoints(this.isMarkingPoints);
+    },
+
+    clearMarkedPoints() {
+      this.markedPoints = [];
+      this.accessibilityAnalysis.clearMarkers();
+      this.pathDistance = null;
     }
   },
 };

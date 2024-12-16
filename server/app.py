@@ -9,6 +9,7 @@ app = Flask(__name__)
 CORS(app)
 
 # 全局变量存储当前的广告牌数据
+current_markers=[]
 current_billboards = []
 current_GEA = []
 current_IA = []
@@ -41,6 +42,25 @@ def get_geojson():
         return jsonify(geojson_collection)      
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/markers', methods=['POST'])
+def save_markers():
+    try:
+        markers_data = request.json.get('features', [])  # 获取 'features' 字段
+        print("接收到的标记点数据:", markers_data)  # 打印接收到的数据
+        global current_markers
+        current_markers = markers_data
+        print("当前保存的标记点数据:", current_markers)  # 直接打印保存的数据     
+        return jsonify({
+            "status": "success",
+            "message": f"成功保存 {len(markers_data)} 个标记点数据",
+            "count": len(markers_data)
+        })        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route('/save-billboards', methods=['POST'])
 def save_billboards():
@@ -59,6 +79,7 @@ def save_billboards():
             "status": "error",
             "message": str(e)
         }), 500
+
 
 @app.route('/GEA', methods=['GET'])
 def calculate_GEA():
@@ -189,6 +210,7 @@ def get_heatmap():
             "status": "error",
             "message": str(e)
         }), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=3000)

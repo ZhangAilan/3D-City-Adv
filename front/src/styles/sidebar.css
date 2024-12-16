@@ -26,4 +26,11 @@
 .sidebar-btn:hover {
     background: #487bad;
     transform: translateX(5px);
+}
+
+
+/* 分组之间的间距 */
+.sidebar-btn.analysis + .sidebar-btn.optimization,
+.sidebar-btn.optimization + .sidebar-btn.utility {
+  margin-top: 10px;  /* 增加组间距 */
 } 
