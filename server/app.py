@@ -3,6 +3,7 @@ from flask_cors import CORS  #跨域
 from config.database import Database
 from analysis.exposure import ExposureAnalyzer
 from analysis.gps_info import GPSAnalyzer
+from analysis.shortest_path import ShortestPath
 import json
 
 app = Flask(__name__)
@@ -46,16 +47,33 @@ def get_geojson():
 @app.route('/markers', methods=['POST'])
 def save_markers():
     try:
-        markers_data = request.json.get('features', [])  # 获取 'features' 字段
-        print("接收到的标记点数据:", markers_data)  # 打印接收到的数据
+        markers_data = request.json.get('features', [])
+        print("[INFO] 接收到的标记点数据:", markers_data)
+        
+        # 提取坐标数据
         global current_markers
-        current_markers = markers_data
-        print("当前保存的标记点数据:", current_markers)  # 直接打印保存的数据     
+        current_markers = []
+        for marker in markers_data:
+            if isinstance(marker, list) and len(marker) == 2:
+                # 如果已经是[lon, lat]格式
+                coords = marker
+            elif isinstance(marker, dict):
+                # 如果是GeoJSON格式
+                coords = marker.get('geometry', {}).get('coordinates', [])
+            else:
+                continue
+                
+            if len(coords) == 2:
+                current_markers.append(coords)
+        
+        print("[INFO] 当前保存的标记点坐标:", current_markers)
+        
         return jsonify({
             "status": "success",
-            "message": f"成功保存 {len(markers_data)} 个标记点数据",
-            "count": len(markers_data)
-        })        
+            "message": f"成功保存 {len(current_markers)} 个标记点数据",
+            "count": len(current_markers)
+        })
+        
     except Exception as e:
         return jsonify({
             "status": "error",
@@ -206,6 +224,58 @@ def get_heatmap():
         return jsonify(heatmap_data)
     except Exception as e:
         print(f"获取热力图时发生错误: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    
+@app.route('/shortest-path', methods=['GET'])
+def get_shortest_path():
+    """获取最短路径"""
+    try:
+        # 确保至少有两个标记点
+        if len(current_markers) < 2:
+            return jsonify({
+                "status": "error",
+                "message": "需要至少两个标记点来计算路径"
+            }), 400
+            
+        # 获取最新的两个标记点的坐标
+        # 假设标记点数据格式为 [lon, lat]
+        end_coords = current_markers[-1]
+        start_coords = current_markers[-2]
+        
+        if not isinstance(end_coords, list) or not isinstance(start_coords, list):
+            return jsonify({
+                "status": "error",
+                "message": "标记点格式错误"
+            }), 400
+            
+        print(f"[INFO] 起点坐标: {start_coords}, 终点坐标: {end_coords}")
+        
+        # 初始化并加载路网
+        sp = ShortestPath()
+        if not sp.load_roads(sp.db):
+            return jsonify({
+                "status": "error",
+                "message": "加载路网数据失败"
+            }), 500
+            
+        # 计算最短路径
+        path = sp.get_shortest_path(start_coords, end_coords)
+        if path is None:
+            return jsonify({
+                "status": "error",
+                "message": "找不到可行的路径"
+            }), 404
+            
+        return jsonify({
+            "status": "success",
+            "data": path
+        })
+        
+    except Exception as e:
+        print(f"[ERROR] 路径计算失败: {str(e)}")
         return jsonify({
             "status": "error",
             "message": str(e)

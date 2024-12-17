@@ -9,6 +9,8 @@ class AccessibilityAnalysis {
     this.markers = [];
     this.isMarkingPoints = false;
     this.pathLayer = null;
+    this.pathSource = 'path-source';
+    this.pathLayerId = 'path-layer';
   }
 
   // 生成六边形网格
@@ -155,7 +157,7 @@ class AccessibilityAnalysis {
         type: 'fill',
         source: this.sourceId,
         paint: {
-          // 修改颜色渐变：红->黄->透明
+          // 颜色渐变：红->黄->透明
           'fill-color': [
             'interpolate',
             ['linear'],
@@ -315,6 +317,81 @@ class AccessibilityAnalysis {
   clearMarkers() {
     this.markers.forEach(marker => marker.remove());
     this.markers = [];
+  }
+
+  // 生成最短路径
+  async generateShortestPath() {
+    try {
+      // 清除已有的路径
+      this.clearPathLayer();
+
+      // 发送请求到后端
+      const response = await fetch('http://127.0.0.1:3000/shortest-path');
+
+      if (!response.ok) {
+        throw new Error('获取路径数据失败');
+      }
+
+      const result = await response.json();
+      console.log('最短路径:', result); // 移到这里打印结果
+      
+      if (result.status === 'success') {
+        // 添加路径图层
+        if (this.map.getSource(this.pathSource)) {
+          this.map.removeSource(this.pathSource);
+        }
+
+        this.map.addSource(this.pathSource, {
+          type: 'geojson',
+          data: result.data
+        });
+
+        // 添加路径线图层
+        this.map.addLayer({
+          id: this.pathLayerId,
+          type: 'line',
+          source: this.pathSource,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#FF4D4F',
+            'line-width': 4,
+            'line-opacity': 0.8
+          }
+        });
+
+        // 调整地图视角以适应路径
+        const coordinates = result.data.geometry.coordinates;
+        const bounds = coordinates.reduce((bounds, coord) => {
+          return bounds.extend(coord);
+        }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+        this.map.fitBounds(bounds, {
+          padding: 50,
+          duration: 1000
+        });
+
+        // 返回路径距离（米）
+        const metersPerDegree = 111319.9; // 赤道上1度对应的米数
+        return result.data.properties.length * metersPerDegree;
+      }
+      return null;
+    } catch (error) {
+      console.error('生成路径失败:', error);
+      throw error;
+    }
+  }
+
+  // 清除路径图层
+  clearPathLayer() {
+    if (this.map.getLayer(this.pathLayerId)) {
+      this.map.removeLayer(this.pathLayerId);
+    }
+    if (this.map.getSource(this.pathSource)) {
+      this.map.removeSource(this.pathSource);
+    }
   }
 }
 

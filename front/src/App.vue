@@ -408,6 +408,11 @@ export default {
     this.exposureAnalysis = new ExposureAnalysis(this.map);
     this.mapLayerManager = new MapLayerManager(this.map);
     this.accessibilityAnalysis = new AccessibilityAnalysis(this.map);
+
+    // 添加对新标记点的监听
+    this.map.on('markerAdded', (e) => {
+      this.markedPoints.push(e.point);
+    });
   },
 
   methods: {
@@ -837,8 +842,28 @@ export default {
     clearMarkedPoints() {
       this.markedPoints = [];
       this.accessibilityAnalysis.clearMarkers();
+      this.accessibilityAnalysis.clearPathLayer();
       this.pathDistance = null;
-    }
+    },
+
+    // 生成最短路径
+    async generateShortestPath() {
+      try {
+        const distance = await this.accessibilityAnalysis.generateShortestPath(this.markedPoints);
+        if (distance) {
+          this.pathDistance = distance;
+        }
+      } catch (error) {
+        console.error('生成路径失败:', error);
+        alert('生成路径失败: ' + error.message);
+      }
+    },
+
+    // 清除路径图层
+    clearPathLayer() {
+      this.accessibilityAnalysis.clearPathLayer();
+      this.pathDistance = null;
+    },
   },
 };
 </script>
