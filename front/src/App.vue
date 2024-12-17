@@ -20,7 +20,7 @@
       <button class="sidebar-btn analysis" @click="toggleWindow('audience-analysis')">
         受众分析
       </button>
-      <button class="sidebar-btn analysis">
+      <button class="sidebar-btn analysis" @click="toggleWindow('neighbor-analysis')">
         邻避分析
       </button>
       <button class="sidebar-btn optimization" @click="toggleWindow('location-optimization')">
@@ -142,7 +142,6 @@
             </button>
           </div>
         </div>
-
         <div class="legend-section">
           <h3>图例说明</h3>
           <div class="legend-content">
@@ -164,7 +163,6 @@
             </div>
           </div>
         </div>
-
         <div class="shortest-path-section">
           <h3>最短路径分析</h3>
           <div class="path-controls">
@@ -221,7 +219,60 @@
     <FloatWindow title="POI分析" class="analysis-window" v-show="activeWindow === 'poi-analysis'"></FloatWindow>
 
     <FloatWindow title="受众分析" class="analysis-window" v-show="activeWindow === 'audience-analysis'"></FloatWindow>
-    
+
+    <FloatWindow title="邻避分析" class="analysis-window" v-show="activeWindow === 'neighbor-analysis'">
+      <div class="neighbor-analysis-panel">
+        <!-- 分析参数部分 -->
+        <div class="analysis-section">
+          <h3>分析参数</h3>
+          <div class="parameter-item">
+            <label>广告牌音量 (dB)</label>
+            <div class="slider-input">
+              <input 
+                type="range" 
+                v-model.number="noiseLevel" 
+                min="30" 
+                max="90" 
+                step="1" 
+                class="slider"
+              >
+              <span class="value">{{ noiseLevel }}</span>
+            </div>
+            <div class="reference-values">
+              <p>参考值：</p>
+              <ul>
+                <li>30dB - 低声耳语</li>
+                <li>50dB - 普通谈话</li>
+                <li>70dB - 繁忙街道</li>
+                <li>90dB - 重型卡车</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 图例说明部分 -->
+        <div class="legend-section">
+          <h3>图例说明</h3>
+          <div class="legend-bar"></div>
+          <div class="legend-labels">
+            <span>低影响</span>
+            <span>中等</span>
+            <span>高影响</span>
+          </div>
+        </div>
+
+        <!-- 底部按钮 -->
+        <div class="bottom-actions">
+          <button class="action-btn primary" @click="handleNoiseAnalysis">
+            开始分析
+          </button>
+          <button class="action-btn danger" @click="clearNoiseAnalysis">
+            清除结果
+          </button>
+        </div>
+      </div>
+    </FloatWindow>
+
     <FloatWindow title="区位优化" class="analysis-window" v-show="activeWindow === 'location-optimization'">
     </FloatWindow>
 
@@ -318,6 +369,8 @@ import '@/styles/settings.css'  // 引入settings.css
 import '@/styles/analysis.css'  // 引入analysis.css
 import '@/styles/sidebar.css'   // 引入sidebar.css
 import '@/styles/accessibility.css';
+import '@/styles/neighbor.css'  // 添加这一行
+import NoiseRadiation from '@/utils/NoiseRadiation.js';
 
 export default {
   name: "App",
@@ -374,6 +427,8 @@ export default {
       isMarkingPoints: false,
       markedPoints: [],
       pathDistance: null,
+      noiseLevel: 60,
+      noiseRadiation: null,
     };
   },
 
@@ -408,6 +463,7 @@ export default {
     this.exposureAnalysis = new ExposureAnalysis(this.map);
     this.mapLayerManager = new MapLayerManager(this.map);
     this.accessibilityAnalysis = new AccessibilityAnalysis(this.map);
+    this.noiseRadiation = new NoiseRadiation(this.map);
 
     // 添加对新标记点的监听
     this.map.on('markerAdded', (e) => {
@@ -864,6 +920,36 @@ export default {
       this.accessibilityAnalysis.clearPathLayer();
       this.pathDistance = null;
     },
+
+    // 处理噪音分析
+    handleNoiseAnalysis() {
+      try {
+        // 获取当前广告牌位置
+        const billboards = this.drawboard.getBillboards();
+        if (!billboards || billboards.length === 0) {
+          throw new Error('请先绘制广告牌');
+        }
+
+        // 对每个广告牌创建辐射圈
+        billboards.forEach(billboard => {
+          const position = billboard.getPosition();
+          this.noiseRadiation.createRadiationCircle(
+            [position.lng, position.lat],
+            this.noiseLevel
+          );
+        });
+      } catch (error) {
+        console.error('噪音分析失败:', error);
+        alert('噪音分析失败: ' + error.message);
+      }
+    },
+
+    // 清除噪音分析
+    clearNoiseAnalysis() {
+      if (this.noiseRadiation) {
+        this.noiseRadiation.clearRadiation();
+      }
+    }
   },
 };
 </script>

@@ -1,0 +1,136 @@
+/* 邻避分析面板 */
+.neighbor-analysis-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+}
+
+/* 分析参数部分 */
+.analysis-section {
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  margin: 15px;
+}
+
+.analysis-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+/* 参数项样式 */
+.parameter-item {
+  margin-bottom: 15px;
+}
+
+.parameter-item label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* 滑块输入区域 */
+.slider-input {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.slider-input input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: #ddd;
+  border-radius: 2px;
+  outline: none;
+}
+
+.slider-input .value {
+  min-width: 35px;
+  color: #666;
+}
+
+/* 参考值列表 */
+.reference-values {
+  font-size: 13px;
+  color: #666;
+}
+
+.reference-values p {
+  margin: 0 0 5px 0;
+}
+
+.reference-values ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.reference-values li {
+  margin: 3px 0;
+}
+
+/* 图例部分 */
+.legend-section {
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  margin: 0 15px 15px 15px;
+}
+
+.legend-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.legend-bar {
+  height: 15px;
+  background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+  border-radius: 2px;
+  margin-bottom: 8px;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+/* 底部按钮 */
+.bottom-actions {
+  margin-top: auto;
+  padding: 15px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  border-top: 1px solid #eee;
+}
+
+.action-btn {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.action-btn.primary {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.action-btn.danger {
+  background-color: #f44336;
+  color: white;
+}
+
+.action-btn:hover {
+  opacity: 0.9;
+} 

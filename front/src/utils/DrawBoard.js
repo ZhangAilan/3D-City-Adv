@@ -206,5 +206,38 @@ export default class DrawBoard {
         this.updateBillboards();
         }
     }
+  
+    /**
+     * 获取广告牌中心位置
+     * @returns {Array} 广告牌位置数组，每个元素包含 lng 和 lat 属性
+     */
+    getBillboards() {
+      return this.billboards.map((billboard, index) => {
+        // 获取广告牌多边形的坐标
+        const coordinates = billboard.geometry.coordinates[0];
+        console.log(`广告牌索引=${index}, 坐标=${JSON.stringify(coordinates)}`);
+        
+        // 计算中心点
+        const center = coordinates.reduce((acc, curr, i) => {
+          // 跳过最后一个点（因为它与第一个点相同，用于闭合多边形）
+          if (i === coordinates.length - 1) return acc;
+          
+          return [
+            acc[0] + curr[0] / (coordinates.length - 1),
+            acc[1] + curr[1] / (coordinates.length - 1)
+          ];
+        }, [0, 0]);
+
+        console.log(`广告牌索引=${index}, 中心点=lng:${center[0]}, lat:${center[1]}`);
+
+        // 返回带有 lng 和 lat 属性的对象
+        return {
+          getPosition: () => ({
+            lng: center[0],
+            lat: center[1]
+          })
+        };
+      });
+    }
 
 }
