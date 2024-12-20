@@ -6,6 +6,7 @@ front/package-lock.json
 server/venv
 __pycache__
 server/config/db_data/taxi_GPS.csv
+front/src/assets/images
 
 
 # local env files

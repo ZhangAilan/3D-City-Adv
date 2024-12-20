@@ -32,7 +32,11 @@
       <button class="sidebar-btn utility" @click="toggleFirstPerson">
         第一人称
       </button>
-      <button class="sidebar-btn utility">
+      <button 
+        class="sidebar-btn utility" 
+        @click="toggleStreetView"
+        :class="{ active: isStreetViewMode }"
+      >
         实景地图
       </button>
       <button class="sidebar-btn utility" @click="toggleWindow('settings')">
@@ -352,6 +356,23 @@
         </div>
       </div>
     </FloatWindow>
+
+    <StreetViewPopup
+      v-if="streetViewPopup.visible"
+      :coordinates="streetViewPopup.coordinates"
+      @close="closeStreetViewPopup"
+    />
+
+    <!-- 街景弹窗 -->
+    <div 
+      v-if="streetViewPopup.visible" 
+      class="street-view-popup-container"
+    >
+      <StreetViewPopup
+        :coordinates="streetViewPopup.coordinates"
+        @close="closeStreetViewPopup"
+      />
+    </div>
   </div>
 </template>
 
@@ -371,12 +392,14 @@ import '@/styles/sidebar.css'   // 引入sidebar.css
 import '@/styles/accessibility.css';
 import '@/styles/neighbor.css'  // 添加这一行
 import NoiseRadiation from '@/utils/NoiseRadiation.js';
+import StreetViewPopup from './components/StreetViewPopup.vue';
 
 export default {
   name: "App",
   components: {
     FloatWindow,
     FirstPersonView,
+    StreetViewPopup,
   },
   data() {
     return {
@@ -429,6 +452,12 @@ export default {
       pathDistance: null,
       noiseLevel: 60,
       noiseRadiation: null,
+      streetViewPopup: {
+        visible: false,
+        coordinates: null,
+      },
+      isStreetViewMode: false,
+      streetViewMarker: null,
     };
   },
 
@@ -469,6 +498,13 @@ export default {
     this.map.on('markerAdded', (e) => {
       this.markedPoints.push(e.point);
     });
+
+    // 添加地图点击事件监听
+    this.map.on('click', (e) => {
+      if (this.isStreetViewMode) {
+        this.handleStreetViewClick(e);
+      }
+    });
   },
 
   methods: {
@@ -494,7 +530,7 @@ export default {
           'cluster': false
         });
 
-        // 添加3D建筑层 - 移除 minzoom 限制
+        // 添加3D建筑层 - 除 minzoom 限制
         this.map.addLayer({
           'id': '3d-buildings',
           'type': 'fill-extrusion',
@@ -641,7 +677,7 @@ export default {
         const option = {
           // 图表标题配置
           title: {
-            text: '24小时GPS轨迹点统计', // 图表主标题文本
+            text: '24小时GPS轨迹统计', // 图表主标题文本
             left: 'center'  // 标题水平居中对齐
           },
           // 提示框配置
@@ -754,7 +790,7 @@ export default {
               ['heatmap-density'],
               0, 'rgba(0, 0, 0, 0)',
               0.2, 'rgba(0, 0, 255, 0.4)',   // 深蓝色
-              0.4, 'rgba(0, 255, 255, 0.6)', // 青色
+              0.4, 'rgba(0, 255, 255, 0.6)', // 青
               0.6, 'rgba(0, 255, 0, 0.7)',   // 绿色
               0.8, 'rgba(255, 255, 0, 0.8)', // 黄色
               0.9, 'rgba(255, 128, 0, 0.9)', // 橙色
@@ -795,7 +831,7 @@ export default {
           const preserveLayers = [];
           const layersToPreserve = ['3d-buildings', 'exposure-area', 'occlusion-area', 'visible-area', 'heatmap-layer'];
           
-          // 保存需要保留的图层信息
+          // 保存需要保留的层信息
           for (const layerId of layersToPreserve) {
             if (this.map.getLayer(layerId)) {
               const sourceId = this.map.getLayer(layerId).source;
@@ -949,7 +985,67 @@ export default {
       if (this.noiseRadiation) {
         this.noiseRadiation.clearRadiation();
       }
-    }
+    },
+
+    toggleStreetView() {
+      this.isStreetViewMode = !this.isStreetViewMode;
+      
+      if (this.isStreetViewMode) {
+        this.map.getCanvas().style.cursor = 'crosshair';
+      } else {
+        this.map.getCanvas().style.cursor = '';
+        this.closeStreetViewPopup();
+      }
+    },
+
+    handleStreetViewClick(e) {
+      if (!this.isStreetViewMode) return;
+
+      // 如果已存在标注点，先移除
+      if (this.streetViewMarker) {
+        this.streetViewMarker.remove();
+      }
+
+      // 创建标注点元素
+      const el = document.createElement('div');
+      el.className = 'street-view-marker';
+      
+      // 创建包装器用于动画
+      const wrapper = document.createElement('div');
+      wrapper.className = 'marker-wrapper';
+      
+      const img = document.createElement('img');
+      img.src = require('@/assets/car.png');
+      
+      wrapper.appendChild(img);
+      el.appendChild(wrapper);
+
+      // 创建新的 Marker
+      this.streetViewMarker = new mapboxgl.Marker({
+        element: el,
+        anchor: 'center'
+      })
+        .setLngLat(e.lngLat)
+        .addTo(this.map);
+      
+      // 触发动画
+      requestAnimationFrame(() => {
+        wrapper.style.transform = 'scale(1)';
+        wrapper.style.opacity = '1';
+      });
+
+      // 更新弹窗信息
+      this.streetViewPopup.coordinates = [e.lngLat.lng, e.lngLat.lat];
+      this.streetViewPopup.visible = true;
+    },
+
+    closeStreetViewPopup() {
+      this.streetViewPopup.visible = false;
+      if (this.streetViewMarker) {
+        this.streetViewMarker.remove();
+        this.streetViewMarker = null;
+      }
+    },
   },
 };
 </script>
@@ -969,5 +1065,62 @@ export default {
   top: 0;
   left: 0;
   z-index: 0;
+}
+
+.mapboxgl-popup {
+  max-width: 300px;
+}
+
+.mapboxgl-popup-content {
+  padding: 0;
+}
+
+.sidebar-btn.active {
+  background-color: #4CAF50;
+  color: white;
+}
+
+/* 确保弹窗显示在最上层 */
+.street-view-popup {
+  z-index: 1000;
+}
+
+.street-view-popup-container {
+  position: fixed;  /* 改为固定定位 */
+  top: 300px;       /* 距离顶部的距离 */
+  right: 20px;     /* 距离右侧的距离 */
+  z-index: 1000;
+  pointer-events: auto;
+  /* 移除 transform 属性 */
+}
+
+/* 移除箭头样式，因为不再需要指向点击位置 */
+.street-view-popup-container::after {
+  display: none;
+}
+
+/* 修改标注点样式 */
+.street-view-marker {
+  width: 24px;
+  height: 24px;
+}
+
+.marker-wrapper {
+  width: 100%;
+  height: 100%;
+  transform: scale(0.5);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.marker-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 添加悬浮效果 */
+.street-view-marker:hover .marker-wrapper {
+  transform: scale(1.1);
 }
 </style>
