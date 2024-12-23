@@ -5,6 +5,7 @@ from analysis.exposure import ExposureAnalyzer
 from analysis.gps_info import GPSAnalyzer
 from analysis.shortest_path import ShortestPath
 import json
+import psycopg2
 
 app = Flask(__name__)
 CORS(app)
@@ -281,6 +282,131 @@ def get_shortest_path():
             "message": str(e)
         }), 500
 
+@app.route('/poi/categories', methods=['GET'])
+def get_poi_categories():
+    """获取所有POI类别"""
+    try:
+        db = Database()
+        cur = db.get_connection().cursor()
+        cur.execute("SELECT DISTINCT category FROM poi WHERE category IS NOT NULL ORDER BY category;")
+        categories = [row[0] for row in cur.fetchall()]
+        return jsonify({
+            "status": "success",
+            "data": categories
+        })
+    except Exception as e:
+        print(f"[ERROR] 获取POI类别失败: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/poi/<category>', methods=['GET'])
+def get_poi_by_category(category):
+    """根据类别获取POI数据"""
+    try:
+        db = Database()
+        conn = db.get_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # 查询特定类别的POI数据
+        cur.execute("""
+            SELECT 
+                name,
+                category,
+                ST_AsGeoJSON(geometry) as geometry,
+                properties
+            FROM poi 
+            WHERE category = %s;
+        """, (category,))
+        
+        rows = cur.fetchall()
+        
+        # 构建GeoJSON格式的响应
+        features = []
+        for row in rows:
+            geometry = json.loads(row['geometry'])
+            feature = {
+                "type": "Feature",
+                "geometry": geometry,
+                "properties": {
+                    "name": row['name'],
+                    "category": row['category'],
+                    **row['properties']
+                }
+            }
+            features.append(feature)
+            
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        
+        return jsonify(geojson)
+        
+    except Exception as e:
+        print(f"[ERROR] 获取{category}类别的POI数据失败: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
+
+@app.route('/regions', methods=['GET'])
+def get_regions():
+    """获取所有区域数据"""
+    try:
+        db = Database()
+        conn = db.get_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # 查询region表中的所有数据
+        cur.execute("""
+            SELECT 
+                name,
+                ST_AsGeoJSON(geometry) as geometry,
+                properties
+            FROM region;
+        """)
+        
+        rows = cur.fetchall()
+        
+        # 构建GeoJSON格式的响应
+        features = []
+        for row in rows:
+            geometry = json.loads(row['geometry'])
+            feature = {
+                "type": "Feature",
+                "geometry": geometry,
+                "properties": {
+                    "name": row['name'],
+                    **row['properties']
+                }
+            }
+            features.append(feature)
+            
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        
+        return jsonify(geojson)
+        
+    except Exception as e:
+        print(f"[ERROR] 获取区域数据失败: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=3000)

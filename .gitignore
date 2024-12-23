@@ -7,7 +7,7 @@ server/venv
 __pycache__
 server/config/db_data/taxi_GPS.csv
 front/src/assets/images
-
+server/config/__pycache__
 
 # local env files
 .env.local

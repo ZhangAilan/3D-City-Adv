@@ -17,9 +17,6 @@
       <button class="sidebar-btn analysis" @click="toggleWindow('poi-analysis')">
         POI分析
       </button>
-      <button class="sidebar-btn analysis" @click="toggleWindow('audience-analysis')">
-        受众分析
-      </button>
       <button class="sidebar-btn analysis" @click="toggleWindow('neighbor-analysis')">
         邻避分析
       </button>
@@ -158,7 +155,7 @@
               </div>
             </div>
             <div class="legend-info">
-              <p>颜色越深表示可达性越强，计算基于：</p>
+              <p>颜色越表示可达性越强，计算基于：</p>
               <ul>
                 <li>步行速度：{{ walkingSpeed }} km/h</li>
                 <li>时间阈值：{{ timeThreshold }} 分钟</li>
@@ -220,9 +217,48 @@
       </div>
     </FloatWindow>
 
-    <FloatWindow title="POI分析" class="analysis-window" v-show="activeWindow === 'poi-analysis'"></FloatWindow>
-
-    <FloatWindow title="受众分析" class="analysis-window" v-show="activeWindow === 'audience-analysis'"></FloatWindow>
+    <FloatWindow title="POI分析" class="analysis-window" v-show="activeWindow === 'poi-analysis'">
+      <div class="poi-analysis-panel">
+        <div class="poi-tags">
+          <button 
+            v-for="tag in poiTags" 
+            :key="tag.id"
+            class="poi-tag"
+            :class="{ active: activePOITags.includes(tag.id) }"
+            @click="togglePOITag(tag.id)"
+          >
+            {{ tag.name }}
+          </button>
+        </div>
+        <div class="poi-controls">
+          <button class="action-btn" @click="fetchPOIData">
+            加载POI数据
+          </button>
+          <button class="action-btn clear" @click="clearPOIData">
+            清除POI数据
+          </button>
+        </div>
+        <div class="poi-legend" v-if="activePOITags.length > 0">
+          <h3>图例</h3>
+          <div class="poi-legend-items">
+            <div 
+              v-for="tag in poiTags.filter(t => activePOITags.includes(t.id))" 
+              :key="tag.id" 
+              class="poi-legend-item"
+            >
+              <div class="poi-color-dot" :style="{ backgroundColor: tag.color }"></div>
+              <span>{{ tag.name }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="poi-chart-wrapper">
+          <div class="poi-chart-container">
+            <div class="poi-chart-title">各街道POI分布统计</div>
+            <div id="poi-region-chart"></div>
+          </div>
+        </div>
+      </div>
+    </FloatWindow>
 
     <FloatWindow title="邻避分析" class="analysis-window" v-show="activeWindow === 'neighbor-analysis'">
       <div class="neighbor-analysis-panel">
@@ -391,8 +427,10 @@ import '@/styles/analysis.css'  // 引入analysis.css
 import '@/styles/sidebar.css'   // 引入sidebar.css
 import '@/styles/accessibility.css';
 import '@/styles/neighbor.css'  // 添加这一行
+import '@/styles/poi.css'      // 添加POI样式文件
 import NoiseRadiation from '@/utils/NoiseRadiation.js';
 import StreetViewPopup from './components/StreetViewPopup.vue';
+import POIAnalysis from '@/utils/POIanaysis.js';
 
 export default {
   name: "App",
@@ -458,6 +496,24 @@ export default {
       },
       isStreetViewMode: false,
       streetViewMarker: null,
+      poiTags: [
+        { id: 'ACCOMMODATION', name: '住宿', color: '#FF0000' },  // 红色
+        { id: 'AUTOMOTIVE', name: '汽车', color: '#00FF00' },    // 绿色
+        { id: 'BUSINESS', name: '商业', color: '#0000FF' },    // 蓝色
+        { id: 'EAT', name: '饮食', color: '#FFFF00' },        // 黄色
+        { id: 'EDUCATION', name: '教育', color: '#FF00FF' },     // 品红
+        { id: 'HEALTH', name: '健康', color: '#00FFFF' },        // 青色
+        { id: 'LANDUSE', name: '土地利用', color: '#800000' },   // 栗色
+        { id: 'PUBLICSERVICE', name: '公共服务', color: '#008000' }, // 深绿色
+        { id: 'RELIGIOUS', name: '宗教', color: '#000080' },     // 海军蓝
+        { id: 'SETTLEMENTS', name: '街道', color: '#FF4500' },   // 橙红色
+        { id: 'SHOP', name: '购物', color: '#2E8B57' },      // 海洋绿
+        { id: 'SPORT', name: '运动', color: '#8A2BE2' },        // 蓝紫色
+        { id: 'TOURISM', name: '旅游', color: '#FFD700' },       // 金色
+        { id: 'TRANSPORT', name: '交通', color: '#DC143C' } // 猩红
+      ],
+      activePOITags: [],
+      poiAnalysis: null,
     };
   },
 
@@ -493,13 +549,14 @@ export default {
     this.mapLayerManager = new MapLayerManager(this.map);
     this.accessibilityAnalysis = new AccessibilityAnalysis(this.map);
     this.noiseRadiation = new NoiseRadiation(this.map);
+    this.poiAnalysis = new POIAnalysis(this.map);
 
     // 添加对新标记点的监听
     this.map.on('markerAdded', (e) => {
       this.markedPoints.push(e.point);
     });
 
-    // 添加地图点击事件监听
+    // 添加地图点击件监听
     this.map.on('click', (e) => {
       if (this.isStreetViewMode) {
         this.handleStreetViewClick(e);
@@ -633,7 +690,7 @@ export default {
       }
     },
 
-    // 清除分析图层
+    // 清除析图层
     clearAnalysisLayers() {
       try {
         this.mapLayerManager.clearAnalysisLayers();
@@ -673,7 +730,7 @@ export default {
         const response = await fetch('http://127.0.0.1:3000/gps-info');
         const data = await response.json();
         const hourCounts = TimeAnalysis.processTimeData(data);
-        // 定义ECharts图表配置选项
+        // 定义ECharts图表置选项
         const option = {
           // 图表标题配置
           title: {
@@ -778,7 +835,7 @@ export default {
               ['linear'],
               ['zoom'],
               0, 20,     // 基础半径
-              10, 25,    // 中等缩放级别
+              10, 25,    // 中等缩放��别
               15, 30,    // 较高缩放级别
               20, 40     // 最大缩放级别
             ],
@@ -951,7 +1008,7 @@ export default {
       }
     },
 
-    // 清除路径图层
+    // 清除径图层
     clearPathLayer() {
       this.accessibilityAnalysis.clearPathLayer();
       this.pathDistance = null;
@@ -1046,6 +1103,73 @@ export default {
         this.streetViewMarker = null;
       }
     },
+
+    // 切换POI标签
+    async togglePOITag(tagId) {
+      const index = this.activePOITags.indexOf(tagId);
+      if (index === -1) {
+        this.activePOITags.push(tagId);
+        // 等待DOM更新
+        await this.$nextTick();
+        // 更新图表
+        const chartDom = document.getElementById('poi-region-chart');
+        if (chartDom) {
+          await this.poiAnalysis.updateRegionChart(tagId, chartDom);
+        }
+      } else {
+        this.activePOITags.splice(index, 1);
+        // 如果没有选中的标签，清除图表
+        if (this.activePOITags.length === 0) {
+          this.poiAnalysis.clearChart();
+        } else {
+          // 等待DOM更新
+          await this.$nextTick();
+          // 更新为最后一个选中的标签的数据
+          const lastTagId = this.activePOITags[this.activePOITags.length - 1];
+          const chartDom = document.getElementById('poi-region-chart');
+          if (chartDom) {
+            await this.poiAnalysis.updateRegionChart(lastTagId, chartDom);
+          }
+        }
+      }
+    },
+
+    // 获取POI数据
+    async fetchPOIData() {
+      try {
+        if (this.activePOITags.length === 0) {
+          alert('请至少选择一个POI类型');
+          return;
+        }
+
+        // 对每个激活的标签发起请求
+        for (const tagId of this.activePOITags) {
+          const tag = this.poiTags.find(t => t.id === tagId);
+          if (!tag) continue;
+
+          await this.poiAnalysis.addPOILayer(tagId, tag.color);
+        }
+
+        // 等待DOM更新
+        await this.$nextTick();
+        // 更新图表（使用最后一个选中的标签）
+        const lastTagId = this.activePOITags[this.activePOITags.length - 1];
+        const chartDom = document.getElementById('poi-region-chart');
+        if (chartDom) {
+          await this.poiAnalysis.updateRegionChart(lastTagId, chartDom);
+        }
+      } catch (error) {
+        console.error('POI数据加载失败:', error);
+        alert('POI数据加载失败: ' + error.message);
+      }
+    },
+
+    // 清除POI数据
+    clearPOIData() {
+      this.poiAnalysis.clearAllPOILayers();
+      this.poiAnalysis.clearChart();
+      this.activePOITags = [];
+    },
   },
 };
 </script>
@@ -1091,15 +1215,12 @@ export default {
   right: 20px;     /* 距离右侧的距离 */
   z-index: 1000;
   pointer-events: auto;
-  /* 移除 transform 属性 */
 }
 
-/* 移除箭头样式，因为不再需要指向点击位置 */
 .street-view-popup-container::after {
   display: none;
 }
 
-/* 修改标注点样式 */
 .street-view-marker {
   width: 24px;
   height: 24px;
@@ -1119,7 +1240,6 @@ export default {
   object-fit: contain;
 }
 
-/* 添加悬浮效果 */
 .street-view-marker:hover .marker-wrapper {
   transform: scale(1.1);
 }

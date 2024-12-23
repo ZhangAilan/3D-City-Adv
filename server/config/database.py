@@ -33,6 +33,8 @@ class Database:
         self.init_geojson_data()
         self.init_gps_data()
         self.init_roads_data()
+        self.init_poi_data()
+        self.init_region_data()
         print("数据库初始化完成")
 
     def create_extensions(self):
@@ -348,6 +350,189 @@ class Database:
             return results
         except Exception as e:
             print(f"查询roads错误: {str(e)}")
+            raise e
+        finally:
+            cur.close()
+            conn.close()
+
+    def check_poi_table(self):
+        """检查poi表是否存在且有数据"""
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            # 检查表是否存在
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'poi'
+                );
+            """)
+            table_exists = cur.fetchone()[0]
+            
+            if not table_exists:
+                return False
+                
+            # 检查表中是否有数据
+            cur.execute("SELECT COUNT(*) FROM poi;")
+            count = cur.fetchone()[0]
+            return count > 0
+        except Exception as e:
+            print(f"检查poi表错误: {str(e)}")
+            return False
+        finally:
+            cur.close()
+            conn.close()
+
+    def init_poi_data(self):
+        """初始化poi表和数据"""
+        if self.check_poi_table():
+            print("poi表已存在且包含数据，跳过初始化")
+            return
+
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            # 创建poi表
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS poi (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255),
+                    category VARCHAR(100),
+                    geometry GEOMETRY(POINT, 4326),
+                    properties JSONB
+                );
+            """)
+            
+            # 创建索引
+            cur.execute("CREATE INDEX IF NOT EXISTS poi_geometry_idx ON poi USING GIST (geometry);")
+            cur.execute("CREATE INDEX IF NOT EXISTS poi_name_idx ON poi (name);")
+            cur.execute("CREATE INDEX IF NOT EXISTS poi_category_idx ON poi (category);")
+            
+            # 读取POI数据
+            poi_path = os.path.join(os.path.dirname(__file__), 
+                                  'db_data', 
+                                  '北京市东城区poi汇总.json')
+            
+            with open(poi_path, 'r', encoding='utf-8') as f:
+                poi_data = json.load(f)
+
+            # 插入数据
+            for feature in poi_data['features']:
+                geometry = feature['geometry']
+                properties = feature['properties']
+                name = properties.get('NAME')
+                category = properties.get('CATEGORY')
+
+                cur.execute("""
+                    INSERT INTO poi (name, category, geometry, properties)
+                    VALUES (%s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), %s);
+                """, (name, category, json.dumps(geometry), json.dumps(properties)))
+
+            conn.commit()
+            print("poi数据初始化成功")
+
+        except Exception as e:
+            print(f"初始化poi数据错误: {str(e)}")
+            conn.rollback()
+            raise e
+        finally:
+            cur.close()
+            conn.close()
+
+    def fetch_poi(self):
+        """获取所有POI数据"""
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("""
+                SELECT name, category, ST_AsGeoJSON(geometry) as geometry, properties 
+                FROM poi
+            """)
+            results = cur.fetchall()
+            return results
+        except Exception as e:
+            print(f"查询poi错误: {str(e)}")
+            raise e
+        finally:
+            cur.close()
+            conn.close()
+
+    def check_region_table(self):
+        """检查region表是否存在且有数据"""
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            # 检查表是否存在
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'region'
+                );
+            """)
+            table_exists = cur.fetchone()[0]
+            
+            if not table_exists:
+                return False
+                
+            # 检查表中是否有数据
+            cur.execute("SELECT COUNT(*) FROM region;")
+            count = cur.fetchone()[0]
+            return count > 0
+        except Exception as e:
+            print(f"检查region表错误: {str(e)}")
+            return False
+        finally:
+            cur.close()
+            conn.close()
+
+    def init_region_data(self):
+        """初始化region表和数据"""
+        if self.check_region_table():
+            print("region表已存在且包含数据，跳过初始化")
+            return
+
+        conn = self.get_connection()
+        try:
+            cur = conn.cursor()
+            # 创建region表
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS region (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255),
+                    geometry GEOMETRY(MULTIPOLYGON, 4326),
+                    properties JSONB
+                );
+            """)
+            
+            # 创建索引
+            cur.execute("CREATE INDEX IF NOT EXISTS region_geometry_idx ON region USING GIST (geometry);")
+            cur.execute("CREATE INDEX IF NOT EXISTS region_name_idx ON region (name);")
+            
+            # 读取region数据
+            region_path = os.path.join(os.path.dirname(__file__), 
+                                  'db_data', 
+                                  '北京市东城区边界.geojson')
+            
+            with open(region_path, 'r', encoding='utf-8') as f:
+                region_data = json.load(f)
+
+            # 插入数据
+            for feature in region_data['features']:
+                geometry = feature['geometry']
+                properties = feature['properties']
+                name = properties.get('name')
+
+                cur.execute("""
+                    INSERT INTO region (name, geometry, properties)
+                    VALUES (%s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), %s);
+                """, (name, json.dumps(geometry), json.dumps(properties)))
+
+            conn.commit()
+            print("region数据初始化成功")
+
+        except Exception as e:
+            print(f"初始化region数据错误: {str(e)}")
+            conn.rollback()
             raise e
         finally:
             cur.close()
